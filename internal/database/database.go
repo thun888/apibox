@@ -2,7 +2,8 @@ package database
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"reflect"
 	"sync"
 
@@ -15,6 +16,8 @@ import (
 	gormlogger "gorm.io/gorm/logger"
 	"gorm.io/gorm/schema"
 )
+
+var logger = slog.New(slog.NewTextHandler(os.Stdout, nil)).With("module", "database")
 
 // DB 全局数据库实例，模块通过 database.DB 直接使用
 var DB *gorm.DB
@@ -62,7 +65,7 @@ func Init(cfg config.DatabaseConfig) error {
 	}
 
 	DB = db
-	log.Printf("Database connected: driver=%s dsn=%s", cfg.Driver, maskDSN(cfg.Driver, cfg.DSN))
+	logger.Info("Database connected", "driver", cfg.Driver, "dsn", maskDSN(cfg.Driver, cfg.DSN))
 
 	if cfg.AutoMigrate {
 		if err := autoMigrate(); err != nil {
@@ -93,7 +96,7 @@ func autoMigrate() error {
 	migratorsMu.Unlock()
 
 	if len(models) == 0 {
-		log.Println("No models registered for migration")
+		logger.Info("No models registered for migration")
 		return nil
 	}
 
@@ -101,7 +104,7 @@ func autoMigrate() error {
 		return fmt.Errorf("auto migrate: %w", err)
 	}
 
-	log.Printf("Auto migrate completed: %d model(s)", len(models))
+	logger.Info("Auto migrate completed", "count", len(models))
 	return nil
 }
 

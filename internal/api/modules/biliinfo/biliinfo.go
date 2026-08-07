@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	"time"
 
@@ -21,6 +20,8 @@ const (
 	bilibiliAPI = "https://api.bilibili.com/x/web-interface/view"
 	cacheTTL    = 1 * time.Hour // 1 小时缓存
 )
+
+var logger = utils.NewModuleLogger("biliinfo")
 
 type Controller struct{}
 
@@ -44,7 +45,7 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 
 	refererHost, err := utils.ExtractHost(referer)
 	if err != nil || !utils.IsAllowed(config.Cfg.Modules.BiliInfo.AllowedReferers, refererHost) {
-		log.Printf("Referer rejected: %s", referer)
+		logger.Warn("Referer rejected", "referer", referer)
 		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
@@ -62,17 +63,17 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	if cache.Client != nil {
 		cached, err := cache.Client.Get(context.Background(), cacheKey).Result()
 		if err == nil && cached != "" {
-			log.Printf("Cache hit: bvid=%s", bvid)
+			logger.Info("Cache hit", "bvid", bvid)
 			ctx.Data(http.StatusOK, "application/json", []byte(cached))
 			return
 		}
 	}
 
 	// 请求 Bilibili API
-	log.Printf("Fetching bvid=%s from Bilibili API", bvid)
+	logger.Info("Fetching from Bilibili API", "bvid", bvid)
 	resp, err := fetchBilibili(ctx.Request.Context(), bvid)
 	if err != nil {
-		log.Printf("Bilibili API error: %v", err)
+		logger.Error("Bilibili API error", "error", err)
 		ctx.JSON(http.StatusBadGateway, gin.H{"error": "upstream error"})
 		return
 	}
@@ -99,7 +100,7 @@ func fetchBilibili(ctx context.Context, bvid string) (interface{}, error) {
 	// 获取 bilibili 域的 Cookie
 	cookies, err := utils.GetCookies(ctx)
 	if err != nil {
-		log.Printf("Failed to get cookies: %v", err)
+		logger.Warn("Failed to get cookies", "error", err)
 	} else {
 		biliCookies := utils.FilterCookiesByDomain(cookies, ".bilibili.com")
 		if len(biliCookies) > 0 {

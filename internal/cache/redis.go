@@ -3,13 +3,16 @@ package cache
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
+	"os"
 	"time"
 
 	"github.com/thun888/apibox/internal/config"
 
 	"github.com/redis/go-redis/v9"
 )
+
+var logger = slog.New(slog.NewTextHandler(os.Stdout, nil)).With("module", "cache")
 
 // Client 全局 Redis 实例，模块通过 cache.Client 直接使用
 var Client *redis.Client
@@ -18,7 +21,7 @@ var Client *redis.Client
 func Init(cfg config.RedisConfig) error {
 	// 未配置 addr 则跳过 Redis 初始化
 	if cfg.Addr == "" {
-		log.Println("Redis not configured, skipping")
+		logger.Info("Redis not configured, skipping")
 		return nil
 	}
 
@@ -42,7 +45,7 @@ func Init(cfg config.RedisConfig) error {
 	}
 
 	Client = rdb
-	log.Printf("Redis connected: addr=%s db=%d", cfg.Addr, cfg.DB)
+	logger.Info("Redis connected", "addr", cfg.Addr, "db", cfg.DB)
 	return nil
 }
 

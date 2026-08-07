@@ -1,7 +1,6 @@
 package starvote
 
 import (
-	"log"
 	"math"
 	"net/http"
 	"strconv"
@@ -15,6 +14,8 @@ import (
 	"github.com/thun888/apibox/internal/database"
 	"github.com/thun888/apibox/internal/utils"
 )
+
+var logger = utils.NewModuleLogger("starvote")
 
 // Controller StarVote 投票/评分模块控制器
 type Controller struct{}
@@ -129,7 +130,7 @@ func (c *Controller) updateRating(ctx *gin.Context) {
 
 	v := int(math.Ceil(floatVal))
 	if err := upsertRating(id, v); err != nil {
-		log.Printf("Database error during rating update: %v", err)
+		logger.Error("Database error during rating update", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 400, "message": "Database error during rating update."})
 		return
 	}
@@ -155,7 +156,7 @@ func (c *Controller) updateVote(ctx *gin.Context) {
 	}
 
 	if err := upsertVote(id, value); err != nil {
-		log.Printf("Database error during vote update: %v", err)
+		logger.Error("Database error during vote update", "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"code": 500, "message": "Database error during vote update."})
 		return
 	}
