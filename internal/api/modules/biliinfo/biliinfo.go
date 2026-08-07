@@ -19,9 +19,10 @@ import (
 const (
 	bilibiliAPI = "https://api.bilibili.com/x/web-interface/view"
 	cacheTTL    = 1 * time.Hour // 1 小时缓存
+	moduleName  = "biliinfo"
 )
 
-var logger = utils.NewModuleLogger("biliinfo")
+var logger = utils.NewModuleLogger(moduleName)
 
 type Controller struct{}
 
@@ -33,7 +34,7 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 	r.GET("/get_video_info", c.getVideoInfo)
 }
 
-func (c *Controller) ModuleName() string { return "biliinfo" }
+func (c *Controller) ModuleName() string { return moduleName }
 
 func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	// Referer 校验

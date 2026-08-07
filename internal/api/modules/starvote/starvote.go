@@ -15,7 +15,10 @@ import (
 	"github.com/thun888/apibox/internal/utils"
 )
 
-var logger = utils.NewModuleLogger("starvote")
+var (
+	moduleName = "starvote"
+)
+var logger = utils.NewModuleLogger(moduleName)
 
 // Controller StarVote 投票/评分模块控制器
 type Controller struct{}
@@ -32,7 +35,7 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 	r.GET("/rating/info", c.getRatingInfo)
 }
 
-func (c *Controller) ModuleName() string { return "starvote" }
+func (c *Controller) ModuleName() string { return moduleName }
 
 // checkReferer 校验 Referer 是否在白名单中
 func checkReferer(ctx *gin.Context) bool {

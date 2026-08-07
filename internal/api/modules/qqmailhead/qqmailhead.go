@@ -15,11 +15,12 @@ import (
 
 const (
 	qqMailIconAPI = "https://wx.mail.qq.com/info/geticon"
+	moduleName    = "qqmail_head"
 )
 
 var emailRegex = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
-var logger = utils.NewModuleLogger("qqmail_head")
+var logger = utils.NewModuleLogger(moduleName)
 
 type Controller struct{}
 
@@ -31,7 +32,7 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 	r.GET("/:email", c.getQQMailHead)
 }
 
-func (c *Controller) ModuleName() string { return "qqmail_head" }
+func (c *Controller) ModuleName() string { return moduleName }
 
 func (c *Controller) getQQMailHead(ctx *gin.Context) {
 	headEmail := ctx.Param("email")
