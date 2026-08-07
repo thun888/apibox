@@ -1,0 +1,17 @@
+server:
+  port: 8080
+  mode: "debug"          # debug | release | test
+  trusted_proxies:
+    - "127.0.0.1"
+    - "10.0.0.0/8"
+    - "172.16.0.0/12"
+    - "192.168.0.0/16"
+
+database:
+  driver: "sqlite"              # mysql | postgres | sqlite
+  dsn: "app.db"                 # sqlite: 文件路径; mysql: user:pass@tcp(host:port)/dbname?parseTime=true
+  max_open_conns: 100
+  max_idle_conns: 10
+  conn_max_lifetime: 3600s      # 连接最大存活时间
+  log_level: "warn"             # silent | error | warn | info
+  auto_migrate: true            # 启动时自动同步表结构
