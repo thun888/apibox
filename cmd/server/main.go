@@ -32,7 +32,7 @@ func main() {
 	}
 	defer cache.Close()
 
-	r := api.SetupRouter(cfg.Server.Mode, cfg.Server.TrustedProxies)
+	r := api.SetupRouter(cfg.Server.Mode, cfg.Server.TrustedProxies, cfg.Server.AllowedOrigins)
 
 	// 优雅关闭
 	go func() {

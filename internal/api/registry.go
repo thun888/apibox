@@ -1,6 +1,11 @@
 package api
 
-import "github.com/gin-gonic/gin"
+import (
+	"time"
+
+	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/gin"
+)
 
 // Controller 接口：所有独立的 API 模块都需实现此接口
 type Controller interface {
@@ -20,10 +25,40 @@ func RegisterController(c Controller) {
 // SetupRouter 统一加载所有已注册的 Controller
 // mode: debug | release | test，在创建 Engine 前设置
 // trustedProxies: 反向代理可信 IP 列表，影响 c.ClientIP()
-func SetupRouter(mode string, trustedProxies []string) *gin.Engine {
+// allowedOrigins: CORS 允许的来源域名列表
+func SetupRouter(mode string, trustedProxies []string, allowedOrigins []string) *gin.Engine {
 	gin.SetMode(mode)
 
 	r := gin.Default()
+
+	// CORS 中间件
+	if len(allowedOrigins) > 0 {
+		corsConfig := cors.Config{
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Origin", "Content-Type", "Accept", "Authorization"},
+			ExposeHeaders:    []string{"Content-Length"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}
+
+		// 检查是否包含 "*" 通配符
+		allowAll := false
+		for _, o := range allowedOrigins {
+			if o == "*" {
+				allowAll = true
+				break
+			}
+		}
+
+		if allowAll {
+			// 允许任意来源：回显请求的 Origin（配合 credentials 不能用 "*"）
+			corsConfig.AllowOriginFunc = func(origin string) bool { return true }
+		} else {
+			corsConfig.AllowOrigins = allowedOrigins
+		}
+
+		r.Use(cors.New(corsConfig))
+	}
 
 	if len(trustedProxies) > 0 {
 		_ = r.SetTrustedProxies(trustedProxies)

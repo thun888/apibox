@@ -6,6 +6,8 @@ server:
     - "10.0.0.0/8"
     - "172.16.0.0/12"
     - "192.168.0.0/16"
+  allowed_origins:       # CORS 跨域白名单，填 "*" 表示允许所有来源
+    - "https://example.com"
 
 database:
   driver: "sqlite"              # mysql | postgres | sqlite

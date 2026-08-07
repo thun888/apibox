@@ -45,6 +45,7 @@ type ServerConfig struct {
 	Port           int      `yaml:"port"`
 	Mode           string   `yaml:"mode"`
 	TrustedProxies []string `yaml:"trusted_proxies"`
+	AllowedOrigins []string `yaml:"allowed_origins"` // CORS 允许的来源域名
 }
 
 // DatabaseConfig 数据库相关配置
