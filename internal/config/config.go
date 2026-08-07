@@ -22,12 +22,21 @@ type Config struct {
 
 // ModulesConfig 各模块独立配置
 type ModulesConfig struct {
-	BiliInfo BiliInfoConfig `yaml:"biliinfo"`
+	BiliInfo    BiliInfoConfig    `yaml:"biliinfo"`
+	CookieCloud CookieCloudConfig `yaml:"cookiecloud"`
 }
 
 // BiliInfoConfig Bilibili 信息模块配置
 type BiliInfoConfig struct {
 	AllowedReferers []string `yaml:"allowed_referers"`
+}
+
+// CookieCloudConfig Cookie 云服务配置
+type CookieCloudConfig struct {
+	Host       string `yaml:"host"`
+	UUID       string `yaml:"uuid"`
+	Password   string `yaml:"password"`
+	CryptoType string `yaml:"crypto_type"` // 留空默认 legacy
 }
 
 // ServerConfig 服务器相关配置

@@ -33,3 +33,8 @@ modules:
       - "767678.xyz"
       - "localhost:4000"
       - "localhost:5000"
+  cookiecloud:
+    host: "https://cookie.example.com"
+    uuid: "your-uuid"
+    password: "your-password"
+    crypto_type: ""          # 留空默认 legacy，可选 aes-128-cbc-fixed

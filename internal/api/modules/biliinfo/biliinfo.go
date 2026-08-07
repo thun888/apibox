@@ -29,7 +29,7 @@ func init() {
 }
 
 func (c *Controller) Register(r *gin.Engine) {
-	r.GET("/api/v1/get_video_info", c.getVideoInfo)
+	r.GET("/api/biliinfo/v1/get_video_info", c.getVideoInfo)
 }
 
 func (c *Controller) getVideoInfo(ctx *gin.Context) {
@@ -68,7 +68,7 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 
 	// 请求 Bilibili API
 	log.Printf("Fetching bvid=%s from Bilibili API", bvid)
-	resp, err := fetchBilibili(bvid)
+	resp, err := fetchBilibili(ctx.Request.Context(), bvid)
 	if err != nil {
 		log.Printf("Bilibili API error: %v", err)
 		ctx.JSON(http.StatusBadGateway, gin.H{"error": "upstream error"})
@@ -85,14 +85,25 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	ctx.Data(http.StatusOK, "application/json", body)
 }
 
-// fetchBilibili 带 UA/Referer 请求 Bilibili API
-func fetchBilibili(bvid string) (interface{}, error) {
+// fetchBilibili 带 UA/Referer/Cookie 请求 Bilibili API
+func fetchBilibili(ctx context.Context, bvid string) (interface{}, error) {
 	apiURL := fmt.Sprintf("%s?bvid=%s", bilibiliAPI, bvid)
 
-	req, _ := http.NewRequest("GET", apiURL, nil)
+	req, _ := http.NewRequestWithContext(ctx, "GET", apiURL, nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
 	req.Header.Set("Referer", "https://www.bilibili.com/")
 	req.Header.Set("Origin", "https://www.bilibili.com/")
+
+	// 获取 bilibili 域的 Cookie
+	cookies, err := utils.GetCookies(ctx)
+	if err != nil {
+		log.Printf("Failed to get cookies: %v", err)
+	} else {
+		biliCookies := utils.FilterCookiesByDomain(cookies, ".bilibili.com")
+		if len(biliCookies) > 0 {
+			req.Header.Set("Cookie", utils.BuildCookieHeader(biliCookies))
+		}
+	}
 
 	client := &http.Client{Timeout: 10 * time.Second}
 	resp, err := client.Do(req)
