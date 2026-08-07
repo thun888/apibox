@@ -16,17 +16,38 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            artifact_name: apibox-windows
+            goos: windows
+            goarch: amd64
             ext: .exe
+            artifact_name: apibox-windows-amd64
+          - os: windows-latest
+            goos: windows
+            goarch: arm64
+            ext: .exe
+            artifact_name: apibox-windows-arm64
           - os: ubuntu-latest
-            artifact_name: apibox-linux
+            goos: linux
+            goarch: amd64
             ext: ""
+            artifact_name: apibox-linux-amd64
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ext: ""
+            artifact_name: apibox-linux-arm64
           - os: macos-latest
-            artifact_name: apibox-macos
+            goos: darwin
+            goarch: amd64
             ext: ""
+            artifact_name: apibox-macos-amd64
+          - os: macos-latest
+            goos: darwin
+            goarch: arm64
+            ext: ""
+            artifact_name: apibox-macos-arm64
 
     runs-on: ${{ matrix.os }}
-    name: Build (${{ matrix.os }})
+    name: Build (${{ matrix.goos }}/${{ matrix.goarch }})
 
     steps:
       - uses: actions/checkout@v4
@@ -39,28 +60,15 @@ jobs:
       - name: Build
         env:
           CGO_ENABLED: "0"
-        run: go build -o dist/apibox${{ matrix.ext }} ./cmd/server/
-
-      - name: Package
-        shell: bash
-        run: |
-          cd dist
-          if [ "${{ matrix.os }}" = "windows-latest" ]; then
-            7z a -tzip ../apibox-windows-amd64.zip apibox.exe
-          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
-            tar -czf ../apibox-linux-amd64.tar.gz apibox
-          else
-            tar -czf ../apibox-macos-amd64.tar.gz apibox
-          fi
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: go build -o dist/apibox-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/server/
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: |
-            apibox-windows-amd64.zip
-            apibox-linux-amd64.tar.gz
-            apibox-macos-amd64.tar.gz
+          path: dist/apibox-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }}
 
   release:
     needs: build
@@ -76,8 +84,5 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            artifacts/apibox-windows/apibox-windows-amd64.zip
-            artifacts/apibox-linux/apibox-linux-amd64.tar.gz
-            artifacts/apibox-macos/apibox-macos-amd64.tar.gz
+          files: artifacts/**/*
 
