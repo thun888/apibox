@@ -8,6 +8,7 @@ import (
 	"syscall"
 
 	"github.com/thun888/apibox/internal/api"
+	"github.com/thun888/apibox/internal/cache"
 	"github.com/thun888/apibox/internal/config"
 	"github.com/thun888/apibox/internal/database"
 	_ "github.com/thun888/apibox/internal/api/modules" // 匿名导入，触发所有 API 模块的 init() 执行
@@ -25,6 +26,12 @@ func main() {
 	}
 	defer database.Close()
 
+	// 初始化 Redis（addr 为空则跳过）
+	if err := cache.Init(cfg.Redis); err != nil {
+		log.Fatalf("Failed to init redis: %v", err)
+	}
+	defer cache.Close()
+
 	r := api.SetupRouter(cfg.Server.Mode, cfg.Server.TrustedProxies)
 
 	// 优雅关闭
@@ -33,6 +40,7 @@ func main() {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 		log.Println("Shutting down...")
+		cache.Close()
 		database.Close()
 		os.Exit(0)
 	}()

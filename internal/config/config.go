@@ -13,6 +13,7 @@ import (
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
+	Redis    RedisConfig    `yaml:"redis"`
 }
 
 // ServerConfig 服务器相关配置
@@ -31,6 +32,18 @@ type DatabaseConfig struct {
 	ConnMaxLifetime time.Duration `yaml:"conn_max_lifetime"`
 	LogLevel        string        `yaml:"log_level"`
 	AutoMigrate     bool          `yaml:"auto_migrate"`
+}
+
+// RedisConfig Redis 相关配置
+type RedisConfig struct {
+	Addr         string        `yaml:"addr"`
+	Password     string        `yaml:"password"`
+	DB           int           `yaml:"db"`
+	PoolSize     int           `yaml:"pool_size"`
+	MinIdleConns int           `yaml:"min_idle_conns"`
+	DialTimeout  time.Duration `yaml:"dial_timeout"`
+	ReadTimeout  time.Duration `yaml:"read_timeout"`
+	WriteTimeout time.Duration `yaml:"write_timeout"`
 }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml

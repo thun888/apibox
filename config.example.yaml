@@ -15,3 +15,13 @@ database:
   conn_max_lifetime: 3600s      # 连接最大存活时间
   log_level: "warn"             # silent | error | warn | info
   auto_migrate: true            # 启动时自动同步表结构
+
+redis:
+  addr: "127.0.0.1:6379"
+  password: ""
+  db: 0
+  pool_size: 100
+  min_idle_conns: 10
+  dial_timeout: 5s
+  read_timeout: 3s
+  write_timeout: 3s
