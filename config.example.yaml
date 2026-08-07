@@ -38,3 +38,7 @@ modules:
     uuid: "your-uuid"
     password: "your-password"
     crypto_type: ""          # 留空默认 legacy，可选 aes-128-cbc-fixed
+  starvote:
+    allowed_referers:
+      - "localhost:4000"
+      - "localhost:5000"

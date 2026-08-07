@@ -4,7 +4,10 @@ import "github.com/gin-gonic/gin"
 
 // Controller 接口：所有独立的 API 模块都需实现此接口
 type Controller interface {
-	Register(r *gin.Engine)
+	// Register 注册路由到给定的 Group（已带 /api/<moduleName> 前缀）
+	Register(r *gin.RouterGroup)
+	// ModuleName 返回模块名，用作路由前缀
+	ModuleName() string
 }
 
 var controllers []Controller
@@ -26,8 +29,10 @@ func SetupRouter(mode string, trustedProxies []string) *gin.Engine {
 		_ = r.SetTrustedProxies(trustedProxies)
 	}
 
+	api := r.Group("/api")
 	for _, c := range controllers {
-		c.Register(r)
+		group := api.Group("/" + c.ModuleName())
+		c.Register(group)
 	}
 	return r
 }

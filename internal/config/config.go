@@ -24,6 +24,7 @@ type Config struct {
 type ModulesConfig struct {
 	BiliInfo    BiliInfoConfig    `yaml:"biliinfo"`
 	CookieCloud CookieCloudConfig `yaml:"cookiecloud"`
+	StarVote    StarVoteConfig    `yaml:"starvote"`
 }
 
 // BiliInfoConfig Bilibili 信息模块配置
@@ -67,6 +68,11 @@ type RedisConfig struct {
 	DialTimeout  time.Duration `yaml:"dial_timeout"`
 	ReadTimeout  time.Duration `yaml:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout"`
+}
+
+// StarVoteConfig 投票/评分模块配置
+type StarVoteConfig struct {
+	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml

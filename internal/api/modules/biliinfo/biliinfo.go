@@ -28,9 +28,11 @@ func init() {
 	api.RegisterController(&Controller{})
 }
 
-func (c *Controller) Register(r *gin.Engine) {
-	r.GET("/api/biliinfo/v1/get_video_info", c.getVideoInfo)
+func (c *Controller) Register(r *gin.RouterGroup) {
+	r.GET("/get_video_info", c.getVideoInfo)
 }
+
+func (c *Controller) ModuleName() string { return "biliinfo" }
 
 func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	// Referer 校验
@@ -77,7 +79,7 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 
 	body, _ := json.Marshal(resp)
 
-	// 5. 写入缓存
+	// 写入缓存
 	if cache.Client != nil {
 		cache.Client.Set(context.Background(), cacheKey, string(body), cacheTTL)
 	}
