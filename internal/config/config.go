@@ -9,11 +9,25 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Cfg 全局配置实例
+var Cfg *Config
+
 // Config 应用顶层配置
 type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
+	Modules  ModulesConfig  `yaml:"modules"`
+}
+
+// ModulesConfig 各模块独立配置
+type ModulesConfig struct {
+	BiliInfo BiliInfoConfig `yaml:"biliinfo"`
+}
+
+// BiliInfoConfig Bilibili 信息模块配置
+type BiliInfoConfig struct {
+	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // ServerConfig 服务器相关配置
@@ -80,5 +94,6 @@ func Load(path ...string) (*Config, error) {
 		cfg.Server.Mode = "release"
 	}
 
+	Cfg = &cfg
 	return &cfg, nil
 }

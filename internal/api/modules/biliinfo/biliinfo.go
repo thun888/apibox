@@ -11,18 +11,11 @@ import (
 
 	"github.com/thun888/apibox/internal/api"
 	"github.com/thun888/apibox/internal/cache"
+	"github.com/thun888/apibox/internal/config"
 	"github.com/thun888/apibox/internal/utils"
 
 	"github.com/gin-gonic/gin"
 )
-
-// Referer 白名单
-var allowedReferers = []string{
-	"hzchu.top",
-	"767678.xyz",
-	"localhost:4000",
-	"localhost:5000",
-}
 
 const (
 	bilibiliAPI = "https://api.bilibili.com/x/web-interface/view"
@@ -48,7 +41,7 @@ func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	}
 
 	refererHost, err := utils.ExtractHost(referer)
-	if err != nil || !utils.IsAllowed(allowedReferers, refererHost) {
+	if err != nil || !utils.IsAllowed(config.Cfg.Modules.BiliInfo.AllowedReferers, refererHost) {
 		log.Printf("Referer rejected: %s", referer)
 		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return

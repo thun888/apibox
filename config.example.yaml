@@ -25,3 +25,11 @@ redis:
   dial_timeout: 5s
   read_timeout: 3s
   write_timeout: 3s
+
+modules:
+  biliinfo:
+    allowed_referers:
+      - "hzchu.top"
+      - "767678.xyz"
+      - "localhost:4000"
+      - "localhost:5000"
