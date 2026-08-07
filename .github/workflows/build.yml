@@ -1,0 +1,83 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            artifact_name: apibox-windows
+            ext: .exe
+          - os: ubuntu-latest
+            artifact_name: apibox-linux
+            ext: ""
+          - os: macos-latest
+            artifact_name: apibox-macos
+            ext: ""
+
+    runs-on: ${{ matrix.os }}
+    name: Build (${{ matrix.os }})
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+
+      - name: Build
+        env:
+          CGO_ENABLED: "0"
+        run: go build -o dist/apibox${{ matrix.ext }} ./cmd/server/
+
+      - name: Package
+        shell: bash
+        run: |
+          cd dist
+          if [ "${{ matrix.os }}" = "windows-latest" ]; then
+            7z a -tzip ../apibox-windows-amd64.zip apibox.exe
+          elif [ "${{ matrix.os }}" = "ubuntu-latest" ]; then
+            tar -czf ../apibox-linux-amd64.tar.gz apibox
+          else
+            tar -czf ../apibox-macos-amd64.tar.gz apibox
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            apibox-windows-amd64.zip
+            apibox-linux-amd64.tar.gz
+            apibox-macos-amd64.tar.gz
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/apibox-windows/apibox-windows-amd64.zip
+            artifacts/apibox-linux/apibox-linux-amd64.tar.gz
+            artifacts/apibox-macos/apibox-macos-amd64.tar.gz
+
