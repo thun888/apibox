@@ -3,6 +3,7 @@
 package modules
 
 import (
+	_ "github.com/thun888/apibox/internal/api/modules/biliinfo"
 	_ "github.com/thun888/apibox/internal/api/modules/order"
 	_ "github.com/thun888/apibox/internal/api/modules/user"
 )

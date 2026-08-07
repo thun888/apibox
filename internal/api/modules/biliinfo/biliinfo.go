@@ -1,0 +1,122 @@
+package biliinfo
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"time"
+
+	"github.com/thun888/apibox/internal/api"
+	"github.com/thun888/apibox/internal/cache"
+	"github.com/thun888/apibox/internal/utils"
+
+	"github.com/gin-gonic/gin"
+)
+
+// Referer 白名单
+var allowedReferers = []string{
+	"hzchu.top",
+	"767678.xyz",
+	"localhost:4000",
+	"localhost:5000",
+}
+
+const (
+	bilibiliAPI = "https://api.bilibili.com/x/web-interface/view"
+	cacheTTL    = 1 * time.Hour // 1 小时缓存
+)
+
+type Controller struct{}
+
+func init() {
+	api.RegisterController(&Controller{})
+}
+
+func (c *Controller) Register(r *gin.Engine) {
+	r.GET("/api/v1/get_video_info", c.getVideoInfo)
+}
+
+func (c *Controller) getVideoInfo(ctx *gin.Context) {
+	// Referer 校验
+	referer := ctx.GetHeader("Referer")
+	if referer == "" {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "missing referer"})
+		return
+	}
+
+	refererHost, err := utils.ExtractHost(referer)
+	if err != nil || !utils.IsAllowed(allowedReferers, refererHost) {
+		log.Printf("Referer rejected: %s", referer)
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+		return
+	}
+
+	// 获取 bvid 参数
+	bvid := ctx.Query("bvid")
+	if bvid == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "missing bvid"})
+		return
+	}
+
+	cacheKey := fmt.Sprintf("video:bvid:%s", bvid)
+
+	// 检查缓存
+	if cache.Client != nil {
+		cached, err := cache.Client.Get(context.Background(), cacheKey).Result()
+		if err == nil && cached != "" {
+			log.Printf("Cache hit: bvid=%s", bvid)
+			ctx.Data(http.StatusOK, "application/json", []byte(cached))
+			return
+		}
+	}
+
+	// 请求 Bilibili API
+	log.Printf("Fetching bvid=%s from Bilibili API", bvid)
+	resp, err := fetchBilibili(bvid)
+	if err != nil {
+		log.Printf("Bilibili API error: %v", err)
+		ctx.JSON(http.StatusBadGateway, gin.H{"error": "upstream error"})
+		return
+	}
+
+	body, _ := json.Marshal(resp)
+
+	// 5. 写入缓存
+	if cache.Client != nil {
+		cache.Client.Set(context.Background(), cacheKey, string(body), cacheTTL)
+	}
+
+	ctx.Data(http.StatusOK, "application/json", body)
+}
+
+// fetchBilibili 带 UA/Referer 请求 Bilibili API
+func fetchBilibili(bvid string) (interface{}, error) {
+	apiURL := fmt.Sprintf("%s?bvid=%s", bilibiliAPI, bvid)
+
+	req, _ := http.NewRequest("GET", apiURL, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+	req.Header.Set("Referer", "https://www.bilibili.com/")
+	req.Header.Set("Origin", "https://www.bilibili.com/")
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return nil, fmt.Errorf("parse bilibili response: %w", err)
+	}
+
+	return result, nil
+}
