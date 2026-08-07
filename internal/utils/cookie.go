@@ -85,6 +85,10 @@ func CookieCloud(ctx context.Context, host, uuid, password, cryptoType string) (
 		return nil, fmt.Errorf("read response: %w", err)
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+
 	var envelope struct {
 		Encrypted  string `json:"encrypted"`
 		CryptoType string `json:"crypto_type"`
