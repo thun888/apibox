@@ -1,6 +1,7 @@
 package api
 
 import (
+	"net/http"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -63,6 +64,10 @@ func SetupRouter(mode string, trustedProxies []string, allowedOrigins []string) 
 	if len(trustedProxies) > 0 {
 		_ = r.SetTrustedProxies(trustedProxies)
 	}
+
+	r.GET("/", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "https://github.com/thun888/apibox/")
+	})
 
 	api := r.Group("/api")
 	for _, c := range controllers {
