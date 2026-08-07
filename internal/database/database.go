@@ -3,6 +3,7 @@ package database
 import (
 	"fmt"
 	"log"
+	"reflect"
 	"sync"
 
 	"github.com/thun888/apibox/internal/config"
@@ -12,6 +13,7 @@ import (
 	"github.com/libtnb/sqlite"
 	"gorm.io/gorm"
 	gormlogger "gorm.io/gorm/logger"
+	"gorm.io/gorm/schema"
 )
 
 // DB 全局数据库实例，模块通过 database.DB 直接使用
@@ -136,4 +138,19 @@ func maskDSN(driver, dsn string) string {
 		return dsn
 	}
 	return "***"
+}
+
+// defaultNaming 默认命名策略（与 GORM 默认一致：蛇形 + 复数 + 小写）
+var defaultNaming = schema.NamingStrategy{}
+
+// BuildTableName 调用 GORM 默认命名策略生成表名，并添加模块前缀
+//
+//	BuildTableName(&Vote{}, "starvote_")  →  "starvote_votes"
+//	BuildTableName(&Rating{}, "starvote_") →  "starvote_ratings"
+func BuildTableName(model interface{}, prefix string) string {
+	t := reflect.TypeOf(model)
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return prefix + defaultNaming.TableName(t.Name())
 }

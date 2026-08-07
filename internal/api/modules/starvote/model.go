@@ -6,6 +6,8 @@ import (
 	"github.com/thun888/apibox/internal/database"
 )
 
+const tablePrefix = "starvote_" // 模块表名前缀
+
 // Vote 投票表模型
 type Vote struct {
 	ID        string    `gorm:"column:id;primaryKey;size:255" json:"id"`
@@ -14,6 +16,8 @@ type Vote struct {
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
+
+func (Vote) TableName() string { return database.BuildTableName(&Vote{}, tablePrefix) }
 
 // Rating 评分表模型 (列名 1-5 对应评分等级)
 type Rating struct {
@@ -26,6 +30,8 @@ type Rating struct {
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime" json:"createdAt"`
 	UpdatedAt time.Time `gorm:"column:updated_at;autoUpdateTime" json:"updatedAt"`
 }
+
+func (Rating) TableName() string { return database.BuildTableName(&Rating{}, tablePrefix) }
 
 func init() {
 	database.RegisterModel(&Vote{})
