@@ -124,7 +124,7 @@ func CookieCloud(ctx context.Context, host, uuid, password, cryptoType string) (
 	return cookies, nil
 }
 
-// GetCookies 从配置读取参数，一键获取 Cookie（零参数便捷方法）
+// GetCookies 一键获取 Cookie
 func GetCookies(ctx context.Context) ([]CookieItem, error) {
 	cfg := config.Cfg.Modules.CookieCloud
 	return CookieCloud(ctx, cfg.Host, cfg.UUID, cfg.Password, cfg.CryptoType)
@@ -200,7 +200,7 @@ func decryptAES128CBCFixed(encrypted string, key []byte) ([]byte, error) {
 	return pkcs7Unpad(plaintext)
 }
 
-// decryptLegacy 解密 CryptoJS legacy 格式（OpenSSL 兼容）
+// decryptLegacy 解密 CryptoJS legacy 格式
 func decryptLegacy(encrypted string, password []byte) ([]byte, error) {
 	data, err := base64.StdEncoding.DecodeString(encrypted)
 	if err != nil {
