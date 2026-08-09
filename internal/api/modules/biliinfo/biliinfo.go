@@ -38,15 +38,7 @@ func (c *Controller) ModuleName() string { return moduleName }
 
 func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	// Referer 校验
-	referer := ctx.GetHeader("Referer")
-	if referer == "" {
-		ctx.JSON(http.StatusForbidden, gin.H{"error": "missing referer"})
-		return
-	}
-
-	refererHost, err := utils.ExtractHost(referer)
-	if err != nil || !utils.IsAllowed(config.Cfg.Modules.BiliInfo.AllowedReferers, refererHost) {
-		logger.Warn("Referer rejected", "referer", referer)
+	if !utils.CheckReferer(config.Cfg.Modules.BiliInfo.AllowedReferers, ctx) {
 		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}

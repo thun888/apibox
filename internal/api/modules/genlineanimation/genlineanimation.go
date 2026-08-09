@@ -33,19 +33,6 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 func (c *Controller) ModuleName() string { return moduleName }
 
-// checkReferer 校验 Referer 是否在白名单中
-func checkReferer(ctx *gin.Context) bool {
-	referer := ctx.GetHeader("Referer")
-	if referer == "" {
-		return false
-	}
-	refererHost, err := utils.ExtractHost(referer)
-	if err != nil {
-		return false
-	}
-	return utils.IsAllowed(config.Cfg.Modules.GenLineAnimation.AllowedReferers, refererHost)
-}
-
 // ---------------------------------------------------------------------------
 // GET  /api/genlineanimation/signature
 //
@@ -53,8 +40,8 @@ func checkReferer(ctx *gin.Context) bool {
 //
 // ---------------------------------------------------------------------------
 func (c *Controller) signature(ctx *gin.Context) {
-	if !checkReferer(ctx) {
-		ctx.Status(http.StatusForbidden)
+	if !utils.CheckReferer(config.Cfg.Modules.GenLineAnimation.AllowedReferers, ctx) {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 

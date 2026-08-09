@@ -37,19 +37,6 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 func (c *Controller) ModuleName() string { return moduleName }
 
-// checkReferer 校验 Referer 是否在白名单中
-func checkReferer(ctx *gin.Context) bool {
-	referer := ctx.GetHeader("Referer")
-	if referer == "" {
-		return false
-	}
-	refererHost, err := utils.ExtractHost(referer)
-	if err != nil {
-		return false
-	}
-	return utils.IsAllowed(config.Cfg.Modules.StarVote.AllowedReferers, refererHost)
-}
-
 // getParam 优先从 POST form 获取参数，fallback 到 Query
 func getParam(ctx *gin.Context, key string) string {
 	v := ctx.PostForm(key)
@@ -112,7 +99,7 @@ func upsertRating(id string, value int) error {
 // POST /api/rating/update  —  评分更新 (value: 1-5，向上取整)
 // ---------------------------------------------------------------------------
 func (c *Controller) updateRating(ctx *gin.Context) {
-	if !checkReferer(ctx) {
+	if !utils.CheckReferer(config.Cfg.Modules.StarVote.AllowedReferers, ctx) {
 		ctx.Status(http.StatusForbidden)
 		return
 	}
@@ -145,7 +132,7 @@ func (c *Controller) updateRating(ctx *gin.Context) {
 // POST /api/vote/update     —  投票更新 (value: up | down)
 // ---------------------------------------------------------------------------
 func (c *Controller) updateVote(ctx *gin.Context) {
-	if !checkReferer(ctx) {
+	if !utils.CheckReferer(config.Cfg.Modules.StarVote.AllowedReferers, ctx) {
 		ctx.Status(http.StatusForbidden)
 		return
 	}
@@ -171,8 +158,8 @@ func (c *Controller) updateVote(ctx *gin.Context) {
 // GET  /api/vote/info       —  查询投票信息
 // ---------------------------------------------------------------------------
 func (c *Controller) getVoteInfo(ctx *gin.Context) {
-	if !checkReferer(ctx) {
-		ctx.Status(http.StatusForbidden)
+	if !utils.CheckReferer(config.Cfg.Modules.StarVote.AllowedReferers, ctx) {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
@@ -210,7 +197,7 @@ func (c *Controller) getVoteInfo(ctx *gin.Context) {
 // GET  /api/rating/info     —  查询评分信息
 // ---------------------------------------------------------------------------
 func (c *Controller) getRatingInfo(ctx *gin.Context) {
-	if !checkReferer(ctx) {
+	if !utils.CheckReferer(config.Cfg.Modules.StarVote.AllowedReferers, ctx) {
 		ctx.Status(http.StatusForbidden)
 		return
 	}
