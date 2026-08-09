@@ -8,6 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// Version 为构建时通过 -ldflags 注入的版本号，如 "v1.2.3"
+// 未注入时默认为 "dev"
+var Version = "dev"
+
 // Controller 接口：所有独立的 API 模块都需实现此接口
 type Controller interface {
 	// Register 注册路由到给定的 Group（已带 /api/<moduleName> 前缀）
@@ -68,7 +72,13 @@ func SetupRouter(mode string, trustedProxies []string, allowedOrigins []string) 
 	r.GET("/", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "https://github.com/thun888/apibox/")
 	})
-
+	// ping
+	r.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"message": "pong",
+			"version": Version,
+		})
+	})
 	api := r.Group("/api")
 	for _, c := range controllers {
 		group := api.Group("/" + c.ModuleName())

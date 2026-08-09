@@ -66,12 +66,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-go-build-
 
+      - name: Set version
+        run: |
+          if [ "${{ github.ref_type }}" = "tag" ]; then
+            echo "VERSION=${{ github.ref_name }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=dev" >> $GITHUB_ENV
+          fi
+        shell: bash
+
       - name: Build
         env:
           CGO_ENABLED: "0"
           GOOS: ${{ matrix.goos }}
           GOARCH: ${{ matrix.goarch }}
-        run: go build -ldflags="-s -w" -o dist/apibox-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/server/
+        run: go build -ldflags="-s -w -X github.com/thun888/apibox/internal/api.Version=${{ env.VERSION }}" -o dist/apibox-${{ matrix.goos }}-${{ matrix.goarch }}${{ matrix.ext }} ./cmd/server/
 
       # - name: Install UPX (Windows)
       #   if: matrix.goos == 'windows' && matrix.goarch == 'amd64'
