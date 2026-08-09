@@ -44,3 +44,7 @@ modules:
     allowed_referers:
       - "localhost:4000"
       - "localhost:5000"
+  genlineanimation:
+    allowed_referers:
+      - "localhost:4000"
+      - "localhost:5000"

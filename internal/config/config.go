@@ -22,9 +22,10 @@ type Config struct {
 
 // ModulesConfig 各模块独立配置
 type ModulesConfig struct {
-	BiliInfo    BiliInfoConfig    `yaml:"biliinfo"`
-	CookieCloud CookieCloudConfig `yaml:"cookiecloud"`
-	StarVote    StarVoteConfig    `yaml:"starvote"`
+	BiliInfo          BiliInfoConfig          `yaml:"biliinfo"`
+	CookieCloud       CookieCloudConfig       `yaml:"cookiecloud"`
+	StarVote          StarVoteConfig          `yaml:"starvote"`
+	GenLineAnimation  GenLineAnimationConfig  `yaml:"genlineanimation"`
 }
 
 // BiliInfoConfig Bilibili 信息模块配置
@@ -73,6 +74,11 @@ type RedisConfig struct {
 
 // StarVoteConfig 投票/评分模块配置
 type StarVoteConfig struct {
+	AllowedReferers []string `yaml:"allowed_referers"`
+}
+
+// GenLineAnimationConfig 手写签名动画模块配置
+type GenLineAnimationConfig struct {
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
