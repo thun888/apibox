@@ -30,21 +30,27 @@ redis:
 
 modules:
   biliinfo:
+    enable: true             # 未配置时默认启用
     allowed_referers:
       - "hzchu.top"
       - "767678.xyz"
       - "localhost:4000"
       - "localhost:5000"
   cookiecloud:
+    enable: true             # 未配置时默认启用
     host: "https://cookie.example.com"
     uuid: "your-uuid"
     password: "your-password"
     crypto_type: ""          # 留空默认 legacy，可选 aes-128-cbc-fixed
+  qqmailhead:
+    enable: true             # 未配置时默认启用
   starvote:
+    enable: true             # 未配置时默认启用
     allowed_referers:
       - "localhost:4000"
       - "localhost:5000"
   genlineanimation:
+    enable: true             # 未配置时默认启用
     allowed_referers:
       - "localhost:4000"
       - "localhost:5000"

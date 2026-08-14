@@ -37,6 +37,8 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 func (c *Controller) ModuleName() string { return moduleName }
 
+func (c *Controller) Enabled() bool { return config.Cfg.Modules.StarVote.Enabled() }
+
 // getParam 优先从 POST form 获取参数，fallback 到 Query
 func getParam(ctx *gin.Context, key string) string {
 	v := ctx.PostForm(key)

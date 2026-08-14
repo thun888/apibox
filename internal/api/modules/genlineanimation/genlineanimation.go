@@ -33,6 +33,8 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 func (c *Controller) ModuleName() string { return moduleName }
 
+func (c *Controller) Enabled() bool { return config.Cfg.Modules.GenLineAnimation.Enabled() }
+
 // ---------------------------------------------------------------------------
 // GET  /api/genlineanimation/signature
 //

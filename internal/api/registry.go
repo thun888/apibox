@@ -18,6 +18,8 @@ type Controller interface {
 	Register(r *gin.RouterGroup)
 	// ModuleName 返回模块名，用作路由前缀
 	ModuleName() string
+	// Enabled 返回模块是否启用；未启用时跳过路由注册
+	Enabled() bool
 }
 
 var controllers []Controller
@@ -81,6 +83,9 @@ func SetupRouter(mode string, trustedProxies []string, allowedOrigins []string) 
 	})
 	api := r.Group("/api")
 	for _, c := range controllers {
+		if !c.Enabled() {
+			continue
+		}
 		group := api.Group("/" + c.ModuleName())
 		c.Register(group)
 	}

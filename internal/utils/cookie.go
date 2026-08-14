@@ -131,6 +131,9 @@ func CookieCloud(ctx context.Context, host, uuid, password, cryptoType string) (
 // GetCookies 一键获取 Cookie
 func GetCookies(ctx context.Context) ([]CookieItem, error) {
 	cfg := config.Cfg.Modules.CookieCloud
+	if !cfg.Enabled() {
+		return nil, fmt.Errorf("cookiecloud module is disabled")
+	}
 	return CookieCloud(ctx, cfg.Host, cfg.UUID, cfg.Password, cfg.CryptoType)
 }
 

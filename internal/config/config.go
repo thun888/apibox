@@ -22,23 +22,11 @@ type Config struct {
 
 // ModulesConfig 各模块独立配置
 type ModulesConfig struct {
-	BiliInfo          BiliInfoConfig          `yaml:"biliinfo"`
-	CookieCloud       CookieCloudConfig       `yaml:"cookiecloud"`
-	StarVote          StarVoteConfig          `yaml:"starvote"`
-	GenLineAnimation  GenLineAnimationConfig  `yaml:"genlineanimation"`
-}
-
-// BiliInfoConfig Bilibili 信息模块配置
-type BiliInfoConfig struct {
-	AllowedReferers []string `yaml:"allowed_referers"`
-}
-
-// CookieCloudConfig Cookie 云服务配置
-type CookieCloudConfig struct {
-	Host       string `yaml:"host"`
-	UUID       string `yaml:"uuid"`
-	Password   string `yaml:"password"`
-	CryptoType string `yaml:"crypto_type"` // 留空默认 legacy
+	BiliInfo         BiliInfoConfig         `yaml:"biliinfo"`
+	CookieCloud      CookieCloudConfig      `yaml:"cookiecloud"`
+	QQMailHead       QQMailHeadConfig       `yaml:"qqmailhead"`
+	StarVote         StarVoteConfig         `yaml:"starvote"`
+	GenLineAnimation GenLineAnimationConfig `yaml:"genlineanimation"`
 }
 
 // ServerConfig 服务器相关配置
@@ -72,15 +60,52 @@ type RedisConfig struct {
 	WriteTimeout time.Duration `yaml:"write_timeout"`
 }
 
-// StarVoteConfig 投票/评分模块配置
-type StarVoteConfig struct {
+// BiliInfoConfig Bilibili 信息模块配置
+type BiliInfoConfig struct {
+	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
-// GenLineAnimationConfig 手写签名动画模块配置
-type GenLineAnimationConfig struct {
+// Enabled 模块是否启用
+func (c *BiliInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// CookieCloudConfig Cookie 云服务配置
+type CookieCloudConfig struct {
+	Enable     *bool  `yaml:"enable"` // 未配置时默认启用
+	Host       string `yaml:"host"`
+	UUID       string `yaml:"uuid"`
+	Password   string `yaml:"password"`
+	CryptoType string `yaml:"crypto_type"` // 留空默认 legacy
+}
+
+// Enabled 模块是否启用
+func (c *CookieCloudConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// QQMailHeadConfig QQ 邮箱头像模块配置
+type QQMailHeadConfig struct {
+	Enable *bool `yaml:"enable"` // 未配置时默认启用
+}
+
+// Enabled 模块是否启用
+func (c *QQMailHeadConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// StarVoteConfig 投票/评分模块配置
+type StarVoteConfig struct {
+	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
+
+// Enabled 模块是否启用
+func (c *StarVoteConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// GenLineAnimationConfig 手写签名动画模块配置
+type GenLineAnimationConfig struct {
+	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	AllowedReferers []string `yaml:"allowed_referers"`
+}
+
+// Enabled 模块是否启用
+func (c *GenLineAnimationConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml
 func Load(path ...string) (*Config, error) {

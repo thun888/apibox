@@ -36,6 +36,8 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 func (c *Controller) ModuleName() string { return moduleName }
 
+func (c *Controller) Enabled() bool { return config.Cfg.Modules.BiliInfo.Enabled() }
+
 func (c *Controller) getVideoInfo(ctx *gin.Context) {
 	// Referer 校验
 	if !utils.CheckReferer(config.Cfg.Modules.BiliInfo.AllowedReferers, ctx) {

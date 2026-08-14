@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/thun888/apibox/internal/api"
+	"github.com/thun888/apibox/internal/config"
 	"github.com/thun888/apibox/internal/utils"
 
 	"github.com/gin-gonic/gin"
@@ -33,6 +34,8 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 }
 
 func (c *Controller) ModuleName() string { return moduleName }
+
+func (c *Controller) Enabled() bool { return config.Cfg.Modules.QQMailHead.Enabled() }
 
 func (c *Controller) getQQMailHead(ctx *gin.Context) {
 	headEmail := ctx.Param("email")
