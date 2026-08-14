@@ -14,17 +14,17 @@ var Cfg *Config
 
 // Config 应用顶层配置
 type Config struct {
-	Server   ServerConfig   `yaml:"server"`
-	Database DatabaseConfig `yaml:"database"`
-	Redis    RedisConfig    `yaml:"redis"`
-	Secrets  SecretsConfig  `yaml:"secrets"`
-	Modules  ModulesConfig  `yaml:"modules"`
+	Server      ServerConfig      `yaml:"server"`
+	Database    DatabaseConfig    `yaml:"database"`
+	Redis       RedisConfig       `yaml:"redis"`
+	CookieCloud CookieCloudConfig `yaml:"cookiecloud"`
+	Secrets     SecretsConfig     `yaml:"secrets"`
+	Modules     ModulesConfig     `yaml:"modules"`
 }
 
 // ModulesConfig 各模块独立配置
 type ModulesConfig struct {
 	BiliInfo         BiliInfoConfig         `yaml:"biliinfo"`
-	CookieCloud      CookieCloudConfig      `yaml:"cookiecloud"`
 	QQMailHead       QQMailHeadConfig       `yaml:"qqmailhead"`
 	StarVote         StarVoteConfig         `yaml:"starvote"`
 	GenLineAnimation GenLineAnimationConfig `yaml:"genlineanimation"`
@@ -66,16 +66,7 @@ type SecretsConfig struct {
 	GitHubToken string `yaml:"github_token"`
 }
 
-// BiliInfoConfig Bilibili 信息模块配置
-type BiliInfoConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
-	AllowedReferers []string `yaml:"allowed_referers"`
-}
-
-// Enabled 模块是否启用
-func (c *BiliInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
-
-// CookieCloudConfig Cookie 云服务配置
+// CookieCloudConfig CookieCloud 服务配置（共享基础设施，非 API 模块）
 type CookieCloudConfig struct {
 	Enable     *bool  `yaml:"enable"` // 未配置时默认启用
 	Host       string `yaml:"host"`
@@ -84,8 +75,17 @@ type CookieCloudConfig struct {
 	CryptoType string `yaml:"crypto_type"` // 留空默认 legacy
 }
 
-// Enabled 模块是否启用
+// Enabled 是否启用
 func (c *CookieCloudConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// BiliInfoConfig Bilibili 信息模块配置
+type BiliInfoConfig struct {
+	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	AllowedReferers []string `yaml:"allowed_referers"`
+}
+
+// Enabled 模块是否启用
+func (c *BiliInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
 
 // QQMailHeadConfig QQ 邮箱头像模块配置
 type QQMailHeadConfig struct {

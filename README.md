@@ -15,7 +15,7 @@
 | [starvote](https://github.com/xaoxuu/star-vote) | `/api/starvote` | 投票与评分 | 数据库 |
 | [genlineanimation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/genlineanimation` | 生成手写签名动画 SVG | 无 |
 
-模块默认启用，可通过 `modules.<name>.enable: false` 关闭（见[配置](#配置)）。CookieCloud 不是独立的 API 模块，它为 biliinfo、qqmail_head 提供 Cookie
+模块默认启用，可通过 `modules.<name>.enable: false` 关闭（见[配置](#配置)）。
 
 ## 快速开始
 
@@ -237,7 +237,8 @@ Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白�
 在 `config.yaml` 中设置 `modules.<name>.enable: false`，该模块的路由将不会注册。
 
 **qqmail_head 返回 500？**
-该模块依赖 CookieCloud。确认 `modules.cookiecloud` 的 `host`/`uuid`/`password` 正确、`GET {host}/get/{uuid}` 可访问、`crypto_type` 与服务端一致（`legacy` 或 `aes-128-cbc-fixed`）。
+
+该模块依赖 CookieCloud。确认 `cookiecloud` 配置里的 `host`/`uuid`/`password` 正确、`GET {host}/get/{uuid}` 可访问、`crypto_type` 与服务端一致（`legacy` 或 `aes-128-cbc-fixed`）。
 
 **配置了 Redis 但启动失败？**
 启动时会先 ping 一次 Redis，连不上则直接退出。不使用 Redis 时将 `redis.addr` 留空。
