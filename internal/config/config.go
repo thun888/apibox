@@ -17,6 +17,7 @@ type Config struct {
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Redis    RedisConfig    `yaml:"redis"`
+	Secrets  SecretsConfig  `yaml:"secrets"`
 	Modules  ModulesConfig  `yaml:"modules"`
 }
 
@@ -58,6 +59,11 @@ type RedisConfig struct {
 	DialTimeout  time.Duration `yaml:"dial_timeout"`
 	ReadTimeout  time.Duration `yaml:"read_timeout"`
 	WriteTimeout time.Duration `yaml:"write_timeout"`
+}
+
+// SecretsConfig 跨模块共享凭据
+type SecretsConfig struct {
+	GitHubToken string `yaml:"github_token"`
 }
 
 // BiliInfoConfig Bilibili 信息模块配置

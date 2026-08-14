@@ -166,7 +166,7 @@ func RegisterController(c Controller)
 | 数据库 | `database.DB`（GORM） | 支持 MySQL/PostgreSQL/SQLite；模型通过 `database.RegisterModel` 注册 |
 | 缓存 | `cache.Client`（go-redis） | 未配置时为 nil，使用前需判空 |
 | 日志 | `utils.NewModuleLogger` | slog 文本输出到 stdout，自动带 `module` 属性 |
-| 配置 | `config.Cfg` | 模块配置集中在 `ModulesConfig` |
+| 配置 | `config.Cfg` | 模块配置在 `ModulesConfig`，共享凭据在顶层 `secrets` 段 |
 
 ### 请求流程（以 biliinfo 为例）
 

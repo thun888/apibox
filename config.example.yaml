@@ -28,6 +28,9 @@ redis:
   read_timeout: 3s
   write_timeout: 3s
 
+secrets:
+  github_token: ""
+
 modules:
   biliinfo:
     enable: true             # 未配置时默认启用
