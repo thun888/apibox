@@ -36,7 +36,7 @@ cookiecloud:
   crypto_type: ""
 
 secrets:
-  github_token: ""          # GitHub token
+  github_token: ""          # GitHub token（starhistory 必需，需仓库管理员/协作者权限）
 
 modules:
   biliinfo:
@@ -58,3 +58,10 @@ modules:
     allowed_referers:
       - "localhost:4000"
       - "localhost:5000"
+  # 星标历史图表（star-history 移植）：/api/starhistory/svg
+  # 数据来自 GitHub stargazers API。2026-06-30 起该 API 仅限仓库
+  # 管理员/协作者访问，因此只能生成本人拥有或协作仓库的图表。
+  # 星标数据在 Redis / 数据库（未配置则跳过）缓存 24 小时。
+  # 无来源校验（SVG 通常内嵌于 README）。
+  starhistory:
+    enable: true

@@ -28,6 +28,7 @@ type ModulesConfig struct {
 	QQMailHead       QQMailHeadConfig       `yaml:"qqmailhead"`
 	StarVote         StarVoteConfig         `yaml:"starvote"`
 	GenLineAnimation GenLineAnimationConfig `yaml:"genlineanimation"`
+	StarHistory      StarHistoryConfig      `yaml:"starhistory"`
 }
 
 // ServerConfig 服务器相关配置
@@ -112,6 +113,17 @@ type GenLineAnimationConfig struct {
 
 // Enabled 模块是否启用
 func (c *GenLineAnimationConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// StarHistoryConfig 星标历史图表模块配置
+// 说明：SVG 图表通常内嵌于 README 等场景（无 Referer），故不做来源校验；
+// 数据来自 GitHub stargazers API（2026-06-30 起仅仓库管理员/协作者可访问，
+// 需 secrets.github_token），经 Redis 缓存（24h）。
+type StarHistoryConfig struct {
+	Enable *bool `yaml:"enable"` // 未配置时默认启用
+}
+
+// Enabled 模块是否启用
+func (c *StarHistoryConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml
 func Load(path ...string) (*Config, error) {

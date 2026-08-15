@@ -6,5 +6,6 @@ import (
 	_ "github.com/thun888/apibox/internal/api/modules/biliinfo"
 	_ "github.com/thun888/apibox/internal/api/modules/genlineanimation"
 	_ "github.com/thun888/apibox/internal/api/modules/qqmailhead"
+	_ "github.com/thun888/apibox/internal/api/modules/starhistory"
 	_ "github.com/thun888/apibox/internal/api/modules/starvote"
 )
