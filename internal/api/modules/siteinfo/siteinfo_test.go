@@ -1,8 +1,14 @@
 package siteinfo
 
 import (
+	"context"
+	"errors"
+	"net/http"
+	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/thun888/apibox/internal/utils"
 )
 
 func mustURL(t *testing.T, raw string) *url.URL {
@@ -119,5 +125,54 @@ func TestResolveIcon(t *testing.T) {
 				t.Errorf("resolveIcon(%q) = %q, want %q", tt.icon, got, tt.want)
 			}
 		})
+	}
+}
+
+// 抓取环回地址应被 SSRF 防护拦截（httptest 监听在 127.0.0.1）。
+func TestFetchSiteInfoBlocksLoopback(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html><head><title>internal</title></head></html>`))
+	}))
+	defer srv.Close()
+
+	_, err := fetchSiteInfo(context.Background(), mustURL(t, srv.URL))
+	if err == nil {
+		t.Fatal("fetchSiteInfo to loopback should fail")
+	}
+	if !errors.Is(err, utils.ErrUnsafeHost) {
+		t.Fatalf("err = %v, want ErrUnsafeHost", err)
+	}
+}
+
+// 图标指向云元数据地址时应被拦截，且不发起任何网络请求。
+func TestFetchIconBlocksMetadata(t *testing.T) {
+	_, err := fetchIcon(context.Background(), "http://169.254.169.254/latest/meta-data/")
+	if err == nil {
+		t.Fatal("fetchIcon to metadata address should fail")
+	}
+	if !errors.Is(err, utils.ErrUnsafeHost) {
+		t.Fatalf("err = %v, want ErrUnsafeHost", err)
+	}
+}
+
+func TestCheckRedirect(t *testing.T) {
+	loopback := mustURL(t, "http://127.0.0.1/admin")
+	if err := checkRedirect(&http.Request{URL: loopback}, nil); !errors.Is(err, utils.ErrUnsafeHost) {
+		t.Errorf("loopback redirect err = %v, want ErrUnsafeHost", err)
+	}
+
+	public := mustURL(t, "https://8.8.8.8/next")
+	if err := checkRedirect(&http.Request{URL: public}, nil); err != nil {
+		t.Errorf("public redirect err = %v, want nil", err)
+	}
+
+	ftp := mustURL(t, "ftp://example.com/file")
+	if err := checkRedirect(&http.Request{URL: ftp}, nil); err == nil {
+		t.Error("non-http(s) redirect should fail")
+	}
+
+	via := make([]*http.Request, 10)
+	if err := checkRedirect(&http.Request{URL: public}, via); err == nil {
+		t.Error("11th redirect should fail")
 	}
 }

@@ -1,6 +1,7 @@
 package siteinfo
 
 // 上游抓取与 HTML 解析：15s 超时、HTML 限 2MB、自动跟随重定向（上限10 次），解析用 golang.org/x/net/html。
+// SSRF 防护：抓取前及每次重定向均校验目标主机，拦截解析到内网/环回/链路本地等保留地址的目标。
 
 import (
 	"context"
@@ -13,6 +14,8 @@ import (
 	"time"
 
 	"golang.org/x/net/html"
+
+	"github.com/thun888/apibox/internal/utils"
 )
 
 const (
@@ -23,7 +26,25 @@ const (
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
 
-var httpClient = &http.Client{Timeout: fetchTimeout}
+var httpClient = &http.Client{
+	Timeout:       fetchTimeout,
+	CheckRedirect: checkRedirect,
+}
+
+// checkRedirect 校验重定向目标（SSRF 防护）：超过 10 跳、非 http(s) 协议、
+// 或主机解析到内网/环回/链路本地等保留地址时拒绝跟随。
+func checkRedirect(req *http.Request, via []*http.Request) error {
+	if len(via) >= 10 {
+		return fmt.Errorf("stopped after 10 redirects")
+	}
+	if s := req.URL.Scheme; s != "http" && s != "https" {
+		return fmt.Errorf("redirect to unsupported scheme %q", s)
+	}
+	if utils.IsUnsafeHost(req.Context(), req.URL.Hostname()) {
+		return fmt.Errorf("%w: redirect target %s", utils.ErrUnsafeHost, req.URL.Hostname())
+	}
+	return nil
+}
 
 // fetchSiteInfo 抓取并解析站点信息。
 func fetchSiteInfo(ctx context.Context, target *url.URL) (siteData, error) {
@@ -37,6 +58,9 @@ func fetchSiteInfo(ctx context.Context, target *url.URL) (siteData, error) {
 }
 
 func fetchHTML(ctx context.Context, target *url.URL) (string, *url.URL, error) {
+	if utils.IsUnsafeHost(ctx, target.Hostname()) {
+		return "", nil, fmt.Errorf("%w: %s", utils.ErrUnsafeHost, target.Hostname())
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
 	if err != nil {
 		return "", nil, err
@@ -200,6 +224,13 @@ func attrVal(t html.Token, name string) string {
 
 // fetchIcon 请求图标 URL；返回的响应体由调用方负责关闭。
 func fetchIcon(ctx context.Context, iconURL string) (*http.Response, error) {
+	u, err := url.Parse(iconURL)
+	if err != nil {
+		return nil, err
+	}
+	if utils.IsUnsafeHost(ctx, u.Hostname()) {
+		return nil, fmt.Errorf("%w: %s", utils.ErrUnsafeHost, u.Hostname())
+	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, iconURL, nil)
 	if err != nil {
 		return nil, err

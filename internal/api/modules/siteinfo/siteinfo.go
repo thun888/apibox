@@ -4,11 +4,13 @@
 //	GET /api/siteinfo/icon?url=...            站点图标二进制代理
 //
 // 相比原版：仅保留 site 类型（type 参数兼容）、修复相对 icon 解析与
-// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天。
+// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天、SSRF 防护
+// （拦截解析到内网/环回/链路本地等保留地址的目标，含重定向目标）。
 package siteinfo
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -124,7 +126,11 @@ func handle(ctx *gin.Context) {
 
 	data, err := fetchSiteInfo(ctx.Request.Context(), u)
 	if err != nil {
-		log.Error("fetch site info failed", "url", target, "error", err)
+		if errors.Is(err, utils.ErrUnsafeHost) {
+			log.Warn("blocked unsafe host", "url", target)
+		} else {
+			log.Error("fetch site info failed", "url", target, "error", err)
+		}
 		ctx.JSON(http.StatusOK, gin.H{})
 		return
 	}
@@ -179,6 +185,10 @@ func handlePureIcon(ctx *gin.Context) {
 	if data.URL == "" { // 未命中缓存（缓存条目必然带 url）
 		data, err = fetchSiteInfo(ctx.Request.Context(), u)
 		if err != nil {
+			if errors.Is(err, utils.ErrUnsafeHost) {
+				ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+				return
+			}
 			log.Error("fetch site info failed", "url", target, "error", err)
 			ctx.JSON(http.StatusBadGateway, gin.H{"error": "upstream error"})
 			return
@@ -230,6 +240,10 @@ func serveIcon(ctx *gin.Context, iconURL string) {
 
 	resp, err := fetchIcon(ctx.Request.Context(), iconURL)
 	if err != nil {
+		if errors.Is(err, utils.ErrUnsafeHost) {
+			ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
+			return
+		}
 		log.Error("fetch icon failed", "icon", iconURL, "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch icon"})
 		return
