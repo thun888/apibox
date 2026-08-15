@@ -1,13 +1,18 @@
 package siteinfo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"testing"
+
+	"github.com/gin-gonic/gin"
 
 	"github.com/thun888/apibox/internal/utils"
 )
@@ -243,5 +248,130 @@ func TestRewriteCachedURL(t *testing.T) {
 
 	if _, ok := rewriteCachedURL("{bad json", "https://x/"); ok {
 		t.Error("invalid json should fail")
+	}
+}
+
+// roundTripFunc 把函数适配为 http.RoundTripper，测试中替换 httpClient 用。
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(req *http.Request) (*http.Response, error) { return f(req) }
+
+// stubIconClient 返回固定响应的 http.Client；ContentLength 置 -1（未知），
+// 使 serveIcon 走真实读取路径判断体积。
+func stubIconClient(status int, ctype string, body []byte) *http.Client {
+	return &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			h := http.Header{}
+			if ctype != "" {
+				h.Set("Content-Type", ctype)
+			}
+			return &http.Response{
+				StatusCode:    status,
+				Status:        fmt.Sprintf("%d %s", status, http.StatusText(status)),
+				Header:        h,
+				Body:          io.NopCloser(bytes.NewReader(body)),
+				ContentLength: -1,
+				Request:       req,
+			}, nil
+		}),
+	}
+}
+
+func iconTestCtx() (*gin.Context, *httptest.ResponseRecorder) {
+	gin.SetMode(gin.TestMode)
+	w := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(w)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/siteinfo/icon", nil)
+	return c, w
+}
+
+func TestServeIconForwardsSmallIcon(t *testing.T) {
+	old := httpClient
+	defer func() { httpClient = old }()
+	httpClient = stubIconClient(http.StatusOK, "image/png", []byte{0x89, 'P', 'N', 'G'})
+
+	c, w := iconTestCtx()
+	serveIcon(c, "http://8.8.8.8/favicon.png")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Content-Type"); got != "image/png" {
+		t.Errorf("content-type = %q, want image/png", got)
+	}
+	if got := w.Header().Get("Content-Length"); got != "4" {
+		t.Errorf("content-length = %q, want 4", got)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "public, max-age=604800" {
+		t.Errorf("cache-control = %q", got)
+	}
+	if !bytes.Equal(w.Body.Bytes(), []byte{0x89, 'P', 'N', 'G'}) {
+		t.Errorf("body = %v", w.Body.Bytes())
+	}
+}
+
+// 体积达到 2MB 即不转发，302 跳转到原图标地址（“只能少于 2MB”）。
+func TestServeIconRedirectsAtLimit(t *testing.T) {
+	old := httpClient
+	defer func() { httpClient = old }()
+	httpClient = stubIconClient(http.StatusOK, "image/png", make([]byte, maxIconSize))
+
+	c, w := iconTestCtx()
+	icon := "http://8.8.8.8/big.png"
+	serveIcon(c, icon)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("code = %d, want 302", w.Code)
+	}
+	if got := w.Header().Get("Location"); got != icon {
+		t.Errorf("location = %q, want %q", got, icon)
+	}
+	if got := w.Header().Get("Cache-Control"); got != "public, max-age=604800" {
+		t.Errorf("cache-control = %q", got)
+	}
+}
+
+// 上游响应已声明超限体积时，不读取 body 直接 302。
+func TestServeIconRedirectsDeclaredOversize(t *testing.T) {
+	old := httpClient
+	defer func() { httpClient = old }()
+	httpClient = &http.Client{
+		Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+			return &http.Response{
+				StatusCode:    http.StatusOK,
+				Status:        "200 OK",
+				Header:        http.Header{"Content-Type": []string{"image/png"}},
+				Body:          io.NopCloser(bytes.NewReader(make([]byte, maxIconSize+1))),
+				ContentLength: maxIconSize + 1,
+				Request:       req,
+			}, nil
+		}),
+	}
+
+	c, w := iconTestCtx()
+	icon := "http://8.8.8.8/huge.png"
+	serveIcon(c, icon)
+
+	if w.Code != http.StatusFound {
+		t.Fatalf("code = %d, want 302", w.Code)
+	}
+	if got := w.Header().Get("Location"); got != icon {
+		t.Errorf("location = %q, want %q", got, icon)
+	}
+}
+
+func TestServeIconFallbackContentType(t *testing.T) {
+	old := httpClient
+	defer func() { httpClient = old }()
+	httpClient = stubIconClient(http.StatusOK, "", []byte("ico"))
+
+	c, w := iconTestCtx()
+	serveIcon(c, "http://8.8.8.8/favicon.ico")
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	if got := w.Header().Get("Content-Type"); got != "image/x-icon" {
+		t.Errorf("content-type = %q, want image/x-icon", got)
 	}
 }

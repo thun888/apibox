@@ -21,7 +21,7 @@ import (
 const (
 	fetchTimeout = 15 * time.Second
 	maxHTMLSize  = 2 << 20 // 2MB
-	maxIconSize  = 2 << 20 // base64 转码图标上限，超限视为失败
+	maxIconSize  = 2 << 20 // 图标体积上限（2MB）：/icon 转发与 base64 转码超限均视为失败
 )
 
 const userAgent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"

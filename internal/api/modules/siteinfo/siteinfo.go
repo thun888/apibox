@@ -4,8 +4,9 @@
 //	GET /api/siteinfo/icon?url=...            站点图标二进制代理
 //
 // 相比原版：仅保留 site 类型（type 参数兼容）、修复相对 icon 解析与
-// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天（缓存 key 按规范化
-// URL 构建）、SSRF 防护
+// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天（站点元数据，缓存
+// key 按规范化 URL 构建）、icon 接口不落 Redis 直接转发（<2MB，超限
+// 302 跳转原图地址）、SSRF 防护
 // （拦截解析到内网/环回/链路本地等保留地址的目标，含重定向目标）。
 package siteinfo
 
@@ -284,31 +285,10 @@ func setCDNCache(ctx *gin.Context) {
 	ctx.Header("Cache-Control", fmt.Sprintf("public, max-age=%d", cdnCacheTTL))
 }
 
-// serveIcon 代理返回图标二进制；图标本体缓存于 Redis，超过 4MB 不缓存直接转发。
+// serveIcon 直接转发图标二进制：体积小于 maxIconSize（2MB）时转发；
+// 达到或超过上限返回 302 跳转到原图标地址，由客户端自行获取。
+// 不落 Redis；响应带 Cache-Control 交给 CDN/浏览器缓存。
 func serveIcon(ctx *gin.Context, iconURL string) {
-	// 图标缓存 key 同样按规范化 URL 构建，等价地址共享条目
-	iconKey := iconURL
-	if iu, err := url.Parse(iconURL); err == nil {
-		iconKey = normalizeTarget(iu)
-	}
-	bodyKey := "siteinfo:icon:" + iconKey
-	mimeKey := "siteinfo:icon:mime:" + iconKey
-
-	// ---------- 图标缓存 ----------
-	if cache.Client != nil {
-		if body, err := cache.Client.Get(ctx, bodyKey).Bytes(); err == nil && len(body) > 0 {
-			mime, _ := cache.Client.Get(ctx, mimeKey).Result()
-			if mime == "" {
-				mime = "image/x-icon"
-			}
-			ctx.Header("Content-Type", mime)
-			ctx.Header("Content-Length", strconv.Itoa(len(body)))
-			setCDNCache(ctx)
-			_, _ = ctx.Writer.Write(body)
-			return
-		}
-	}
-
 	resp, err := fetchIcon(ctx.Request.Context(), iconURL)
 	if err != nil {
 		if errors.Is(err, utils.ErrUnsafeHost) {
@@ -325,37 +305,32 @@ func serveIcon(ctx *gin.Context, iconURL string) {
 		return
 	}
 
+	// 上游已声明体积超限时直接 302，避免白拉大对象
+	if resp.ContentLength >= maxIconSize {
+		setCDNCache(ctx)
+		ctx.Redirect(http.StatusFound, iconURL)
+		return
+	}
+
 	contentType := resp.Header.Get("Content-Type")
 	if contentType == "" {
 		contentType = "image/x-icon"
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, maxIconSize+1))
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxIconSize))
 	if err != nil {
 		log.Error("read icon failed", "icon", iconURL, "error", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch icon"})
 		return
 	}
-
-	ctx.Header("Content-Type", contentType)
-	setCDNCache(ctx)
-	if len(body) > maxIconSize {
-		// 超限不缓存：先输出已读部分，再转发剩余
-		if resp.ContentLength >= 0 {
-			ctx.Header("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
-		}
-		_, _ = ctx.Writer.Write(body)
-		_, _ = io.Copy(ctx.Writer, resp.Body)
+	if len(body) >= maxIconSize { // 读到上限说明体积 >= 2MB，302 跳转原地址
+		setCDNCache(ctx)
+		ctx.Redirect(http.StatusFound, iconURL)
 		return
 	}
 
-	if cache.Client != nil {
-		if err := cache.Client.Set(ctx, bodyKey, string(body), cacheTTL).Err(); err != nil {
-			log.Warn("set icon cache failed", "icon", iconURL, "error", err)
-		} else if err := cache.Client.Set(ctx, mimeKey, contentType, cacheTTL).Err(); err != nil {
-			log.Warn("set icon mime cache failed", "icon", iconURL, "error", err)
-		}
-	}
+	ctx.Header("Content-Type", contentType)
 	ctx.Header("Content-Length", strconv.Itoa(len(body)))
+	setCDNCache(ctx)
 	_, _ = ctx.Writer.Write(body)
 }
 
