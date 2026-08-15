@@ -14,6 +14,7 @@
 | [qqmail_head](https://github.com/thun888/qq-mail-head) | `/api/qqmail_head` | 获取 QQ 邮箱头像 | CookieCloud（必需） |
 | [starvote](https://github.com/xaoxuu/star-vote) | `/api/starvote` | 投票与评分 | 数据库 |
 | [genlineanimation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/genlineanimation` | 生成手写签名动画 SVG | 无 |
+| [siteinfo](https://github.com/xaoxuu/site-info-api) | `/api/siteinfo` | 抓取网页标题/描述/图标 | Redis（可选） |
 | [starhistory](https://github.com/Mubelotix/star-history) | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
 
 模块默认启用，可通过 `modules.<name>.enable: false` 关闭（见[配置](#配置)）。
@@ -132,6 +133,48 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 
 返回 SVG（`image/svg+xml`），响应头 `Cache-Control: public, max-age=31536000`。
 
+### siteinfo — 网页站点信息
+
+移植 [site-info-api](https://github.com/thun888/site-info-api) 两个接口：
+
+#### `GET /api/siteinfo/info` — 站点信息 JSON
+
+| 参数 | 缺省 | 说明 |
+|------|------|------|
+| url | 必填 | 目标网页 URL（仅 http/https） |
+| type | `site` | 兼容参数，仅接受 `site`，其余值返回 `{}` |
+| base64 | 无 | 为 `1`/`true` 时抓取图标转 data URL，填入 `iconBase64` |
+
+- 返回 `{"title","desc","icon","iconBase64","url"}`，字段缺省省略；未提取到任何信息或上游失败返回 `{}`。
+
+#### `GET /api/siteinfo/icon` — 站点图标二进制
+
+由原版 `pureicon=1` 查询参数拆分而来。
+
+| 参数 | 缺省 | 说明 |
+|------|------|------|
+| url | 必填 | 目标网页 URL（仅 http/https） |
+
+- 返回图标文件本体（二进制），Content-Type 来自图标上游，缺省 `image/x-icon`。
+- 错误响应（JSON）：400 `{"error":"Invalid url"}`；404 `{"error":"Icon not found"}`（页面未提取到图标或图标上游非 200）；500 `{"error":"Failed to fetch icon"}`（图标抓取失败）；502 `{"error":"upstream error"}`（页面抓取失败）。
+
+#### 共同行为
+
+- 图标选择顺序：`rel=apple-touch-icon` → `rel=icon` → `og:image` → `twitter:image` → 其他含 icon 的 link；相对路径按页面最终 URL 解析（原版会丢失路径基准）；`data:`/`javascript:` 等非 http(s) 结果丢弃。
+- 站点信息与图标本体均 Redis 缓存 30 天（图标超过 2MB 不缓存，直接转发）；响应头 `Cache-Control: public, max-age=604800`（与原版 CDN 头一致）。
+- 抓取超时 15s、HTML 上限 2MB、跟随重定向上限 10 次（原版无超时、无上限）。
+- 403（Referer 不在白名单）。
+
+示例：
+
+```bash
+curl "http://localhost:8080/api/siteinfo/info?url=https://github.com/thun888/apibox&base64=1" \
+  -H "Referer: http://localhost:4000/"
+
+curl -o icon.png "http://localhost:8080/api/siteinfo/icon?url=https://github.com/thun888/apibox" \
+  -H "Referer: http://localhost:4000/"
+```
+
 ### starhistory — GitHub 星标历史图表
 
 [star-history](https://github.com/Mubelotix/star-history) 的 SVG 生成能力移植，`GET /api/starhistory/svg`。
@@ -210,7 +253,7 @@ func RegisterController(c Controller)
 
 ## 安全
 
-- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
+- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
 - **CORS**：`server.allowed_origins`。包含 `"*"` 时允许任意 Origin（回显请求 Origin，配合 Credentials 不能直接返回 `*`）；否则按列表精确匹配。
 - **可信代理**：`server.trusted_proxies` 传给 gin 的 `SetTrustedProxies`，影响 `c.ClientIP()`。
 
@@ -260,7 +303,7 @@ func (Vote) TableName() string { return database.BuildTableName(&Vote{}, "starvo
 ## FAQ
 
 **接口返回 403？**
-Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白名单中（后缀匹配）。qqmail_head 不校验 Referer。
+Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白名单中（后缀匹配）。qqmail_head、starhistory 不校验 Referer。
 
 **starhistory 返回 404？**
 2026-06-30 起 GitHub 将 stargazers API 限制为仓库管理员/协作者可见，因此只能生成本人拥有/协作仓库的图表（其他仓库返回 `Repo not found in dataset`）；星标记录少于 5 条的仓库同样返回 404。

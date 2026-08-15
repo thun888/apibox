@@ -29,6 +29,7 @@ type ModulesConfig struct {
 	StarVote         StarVoteConfig         `yaml:"starvote"`
 	GenLineAnimation GenLineAnimationConfig `yaml:"genlineanimation"`
 	StarHistory      StarHistoryConfig      `yaml:"starhistory"`
+	SiteInfo         SiteInfoConfig         `yaml:"siteinfo"`
 }
 
 // ServerConfig 服务器相关配置
@@ -124,6 +125,15 @@ type StarHistoryConfig struct {
 
 // Enabled 模块是否启用
 func (c *StarHistoryConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+
+// SiteInfoConfig 站点信息模块配置
+type SiteInfoConfig struct {
+	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	AllowedReferers []string `yaml:"allowed_referers"`
+}
+
+// Enabled 模块是否启用
+func (c *SiteInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml
 func Load(path ...string) (*Config, error) {
