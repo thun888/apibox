@@ -179,11 +179,11 @@ func renderChart(o renderOptions) string {
 	b.WriteString(`<g>`)
 
 	// ---------- 水印 ----------
-	fmt.Fprintf(&b, `<text style="font-size: 16px; fill: #666666;" transform="translate(%s,%s)" text-anchor="middle">star-history.dera.page</text>`,
-		jsNum(chartWidth-50), jsNum(chartHeight+40))
-	starScale := 28.0 / 1095.0
-	fmt.Fprintf(&b, `<g transform="translate(%s,%s) scale(%s)"><path d="%s" fill="#eac54f" fill-rule="evenodd" stroke="#eac54f" stroke-width="0.25" stroke-linejoin="round"></path></g>`,
-		jsNum(chartWidth-162), jsNum(chartHeight+19), jsNum(starScale), watermarkStarPath)
+	// fmt.Fprintf(&b, `<text style="font-size: 16px; fill: #666666;" transform="translate(%s,%s)" text-anchor="middle">star-history.dera.page</text>`,
+	// 	jsNum(chartWidth-50), jsNum(chartHeight+40))
+	// starScale := 28.0 / 1095.0
+	// fmt.Fprintf(&b, `<g transform="translate(%s,%s) scale(%s)"><path d="%s" fill="#eac54f" fill-rule="evenodd" stroke="#eac54f" stroke-width="0.25" stroke-linejoin="round"></path></g>`,
+	// 	jsNum(chartWidth-162), jsNum(chartHeight+19), jsNum(starScale), watermarkStarPath)
 
 	// ---------- X 轴 ----------
 	var xTicks []float64
