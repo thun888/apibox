@@ -2,6 +2,7 @@ package siteinfo
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -174,5 +175,73 @@ func TestCheckRedirect(t *testing.T) {
 	via := make([]*http.Request, 10)
 	if err := checkRedirect(&http.Request{URL: public}, via); err == nil {
 		t.Error("11th redirect should fail")
+	}
+}
+
+func TestNormalizeTarget(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"empty path becomes root", "https://a.com", "https://a.com/"},
+		{"scheme and host lowercased", "HTTPS://EXAMPLE.com", "https://example.com/"},
+		{"default http port stripped", "http://a.com:80/x", "http://a.com/x"},
+		{"default https port stripped", "https://a.com:443/x", "https://a.com/x"},
+		{"non-default port kept", "http://a.com:8080/", "http://a.com:8080/"},
+		{"fragment dropped", "https://a.com/p#frag", "https://a.com/p"},
+		{"query sorted", "https://a.com/?b=2&a=1", "https://a.com/?a=1&b=2"},
+		{"dot segments cleaned", "https://a.com/x/../y", "https://a.com/y"},
+		{"userinfo stripped", "https://u:p@a.com/", "https://a.com/"},
+		{"unicode host to punycode", "https://BÜCHER.de/", "https://xn--bcher-kva.de/"},
+		{"ipv6 host bracketed and lowercased", "http://[2001:DB8::1]/", "http://[2001:db8::1]/"},
+		{"escaped path detail dropped", "https://a.com/%7e", "https://a.com/~"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			u := mustURL(t, tt.in)
+			if got := normalizeTarget(u); got != tt.want {
+				t.Errorf("normalizeTarget(%q) = %q, want %q", tt.in, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestSiteDataCacheKey(t *testing.T) {
+	plain := normalizeTarget(mustURL(t, "https://a.com"))
+	slash := normalizeTarget(mustURL(t, "https://a.com/"))
+	if siteDataCacheKey(plain, false) != siteDataCacheKey(slash, false) {
+		t.Error("equivalent URLs should share cache key")
+	}
+	if got := siteDataCacheKey("https://a.com/", false); got != "siteinfo:data:https://a.com/" {
+		t.Errorf("plain key = %q", got)
+	}
+	if got := siteDataCacheKey("https://a.com/", true); got != "siteinfo:data64:https://a.com/" {
+		t.Errorf("base64 key = %q", got)
+	}
+	// 命名空间隔离：避免旧格式中 URL 含 "|" 后缀与 base64 变体的 key 碰撞
+	if siteDataCacheKey("https://a.com/?x=|true", false) == siteDataCacheKey("https://a.com/?x=", true) {
+		t.Error("variants must use distinct namespaces")
+	}
+}
+
+func TestRewriteCachedURL(t *testing.T) {
+	b, ok := rewriteCachedURL(`{"title":"t","url":"https://first.example/"}`, "https://second.example/")
+	if !ok {
+		t.Fatal("rewrite should succeed")
+	}
+	var d siteData
+	if err := json.Unmarshal(b, &d); err != nil {
+		t.Fatal(err)
+	}
+	if d.URL != "https://second.example/" {
+		t.Errorf("url = %q, want rewritten value", d.URL)
+	}
+	if d.Title != "t" {
+		t.Errorf("title = %q, want preserved value", d.Title)
+	}
+
+	if _, ok := rewriteCachedURL("{bad json", "https://x/"); ok {
+		t.Error("invalid json should fail")
 	}
 }

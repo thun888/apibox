@@ -4,7 +4,8 @@
 //	GET /api/siteinfo/icon?url=...            站点图标二进制代理
 //
 // 相比原版：仅保留 site 类型（type 参数兼容）、修复相对 icon 解析与
-// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天、SSRF 防护
+// rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天（缓存 key 按规范化
+// URL 构建）、SSRF 防护
 // （拦截解析到内网/环回/链路本地等保留地址的目标，含重定向目标）。
 package siteinfo
 
@@ -13,12 +14,16 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
+	"path"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"golang.org/x/net/idna"
 
 	"github.com/thun888/apibox/internal/api"
 	"github.com/thun888/apibox/internal/cache"
@@ -68,10 +73,54 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 	r.GET("/icon", handlePureIcon)
 }
 
-// siteDataCacheKey 站点信息缓存 key；base64 变体分开缓存，
-// icon 接口复用无 base64 变体的 key。
-func siteDataCacheKey(target string, needBase64 bool) string {
-	return fmt.Sprintf("siteinfo:%s|%t", target, needBase64)
+// siteDataCacheKey 站点信息缓存 key：基于规范化后的 URL 构建，语义等价的
+// 请求（大小写、默认端口、fragment、参数顺序等差异）共享缓存条目；
+// base64 变体使用独立命名空间（icon 接口复用普通变体的 key），
+// 避免旧格式 "siteinfo:<url>|%t" 中 URL 含 "|" 后缀时可能的 key 碰撞。
+func siteDataCacheKey(normalized string, needBase64 bool) string {
+	if needBase64 {
+		return "siteinfo:data64:" + normalized
+	}
+	return "siteinfo:data:" + normalized
+}
+
+// normalizeTarget 规范化 URL 用作缓存 key：统一 scheme/host 大小写与 IDN、
+// 剥离用户信息与默认端口、丢弃 fragment、空路径补 "/"、清理点分路径段并
+// 按字典序重排查询参数，使等价请求共享缓存条目。
+func normalizeTarget(u *url.URL) string {
+	clone := *u
+	clone.User = nil
+
+	clone.Scheme = strings.ToLower(clone.Scheme)
+
+	host := strings.ToLower(clone.Hostname())
+	if ascii, err := idna.Lookup.ToASCII(host); err == nil {
+		host = ascii
+	}
+	port := clone.Port()
+	if port != "" && ((clone.Scheme == "http" && port == "80") ||
+		(clone.Scheme == "https" && port == "443")) {
+		port = ""
+	}
+	switch {
+	case port != "":
+		clone.Host = net.JoinHostPort(host, port)
+	case strings.Contains(host, ":"):
+		clone.Host = "[" + host + "]"
+	default:
+		clone.Host = host
+	}
+
+	clone.Fragment = ""
+	if clone.Path == "" {
+		clone.Path = "/"
+	} else {
+		clone.Path = path.Clean(clone.Path)
+	}
+	clone.RawPath = "" // 丢弃解析时的转义细节，统一使用规范化后的 Path
+	clone.ForceQuery = false
+	clone.RawQuery = clone.Query().Encode()
+	return clone.String()
 }
 
 func checkAllowed(ctx *gin.Context) bool {
@@ -80,6 +129,18 @@ func checkAllowed(ctx *gin.Context) bool {
 	}
 	ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 	return false
+}
+
+// rewriteCachedURL 将缓存 JSON 中的 url 字段替换为本次请求的原始 target，
+// 保证规范化 key 共享缓存条目时响应仍回显请求方传入的 URL。
+func rewriteCachedURL(val, target string) ([]byte, bool) {
+	var d siteData
+	if err := json.Unmarshal([]byte(val), &d); err != nil {
+		return nil, false
+	}
+	d.URL = target
+	b, err := json.Marshal(d)
+	return b, err == nil
 }
 
 // parseTarget 校验 url 参数：scheme 必须 http/https 且 host 非空。
@@ -113,12 +174,17 @@ func handle(ctx *gin.Context) {
 	}
 	needBase64 := isTruthy(ctx.Query("base64"))
 
-	cacheKey := siteDataCacheKey(target, needBase64)
+	cacheKey := siteDataCacheKey(normalizeTarget(u), needBase64)
 
 	// ---------- JSON 结果缓存 ----------
 	if cache.Client != nil {
 		if val, err := cache.Client.Get(ctx, cacheKey).Result(); err == nil && val != "" {
 			setCDNCache(ctx)
+			// 条目按规范化 key 共享，命中时把 url 回写为本次请求的原始值
+			if b, ok := rewriteCachedURL(val, target); ok {
+				ctx.Data(http.StatusOK, "application/json;charset=utf-8", b)
+				return
+			}
 			ctx.Data(http.StatusOK, "application/json;charset=utf-8", []byte(val))
 			return
 		}
@@ -170,7 +236,7 @@ func handlePureIcon(ctx *gin.Context) {
 	}
 
 	// ---------- 站点信息缓存（与主接口共享，无 base64 变体） ----------
-	dataCacheKey := siteDataCacheKey(target, false)
+	dataCacheKey := siteDataCacheKey(normalizeTarget(u), false)
 	var (
 		data siteData
 		err  error
@@ -220,8 +286,13 @@ func setCDNCache(ctx *gin.Context) {
 
 // serveIcon 代理返回图标二进制；图标本体缓存于 Redis，超过 4MB 不缓存直接转发。
 func serveIcon(ctx *gin.Context, iconURL string) {
-	bodyKey := "siteinfo:icon:" + iconURL
-	mimeKey := "siteinfo:icon:mime:" + iconURL
+	// 图标缓存 key 同样按规范化 URL 构建，等价地址共享条目
+	iconKey := iconURL
+	if iu, err := url.Parse(iconURL); err == nil {
+		iconKey = normalizeTarget(iu)
+	}
+	bodyKey := "siteinfo:icon:" + iconKey
+	mimeKey := "siteinfo:icon:mime:" + iconKey
 
 	// ---------- 图标缓存 ----------
 	if cache.Client != nil {
