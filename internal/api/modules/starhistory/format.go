@@ -4,41 +4,24 @@ package starhistory
 //   - shared/packages/utils/getFormatNumber.tsx
 //   - shared/packages/utils/getFormatTimeline.tsx（dayjs duration 常量）
 //   - d3-scale@3.3.0 time.js 的 tickFormat 边界链（非 multiFormat）
+//
+// 小数格式化用 strconv.FormatFloat 近似 JS toFixed（.5 边界为银行家舍入而非
+// JS 的五入，仅标签末位可能有差，如 50 星显示 "0.0k" 而非 "0.1k"）。
 
 import (
 	"math"
 	"strconv"
-	"strings"
 	"time"
 )
 
-// jsNum 模拟 JS 数字转字符串（shortest round-trip），保证路径坐标等
-// 输出与 d3-path 一致。
+// jsNum 输出与 JS 数字转字符串等价的表示（最短往返、-0 归一为 0）。
+// 本模块数值域（坐标 ≤ ~1000、时间戳毫秒 ≤ ~3.2e11）远离 JS 的指数阈值
+// （1e21 / 1e-6），'f' 最短形式与 JS 输出一致；NaN 归一为 0 防止渲染垃圾。
 func jsNum(v float64) string {
-	if v == 0 || math.IsNaN(v) {
+	if math.IsNaN(v) {
 		return "0"
 	}
-	a := math.Abs(v)
-	if a >= 1e21 || a < 1e-6 {
-		s := strconv.FormatFloat(v, 'e', -1, 64)
-		if i := strings.IndexByte(s, 'e'); i >= 0 {
-			mant, exp := s[:i], s[i+1:]
-			if strings.HasPrefix(exp, "-") && len(exp) > 2 {
-				exp = "-" + strings.TrimLeft(exp[1:], "0")
-			}
-			return mant + "e" + exp
-		}
-		return s
-	}
-	return strconv.FormatFloat(v, 'f', -1, 64)
-}
-
-// jsToFixed 近似 JS Number.prototype.toFixed(digits)（正值，四舍五入、
-// 遇 .5 进位），用于 k/M 单位的 1 位小数与月/年的整数输出。
-func jsToFixed(v float64, digits int) string {
-	m := math.Pow(10, float64(digits))
-	r := math.Floor(v*m+0.5) / m
-	return strconv.FormatFloat(r, 'f', digits, 64)
+	return strconv.FormatFloat(v+0, 'f', -1, 64)
 }
 
 // ---------- getFormatNumber ----------
@@ -61,12 +44,12 @@ func formatNumber(n float64, unit float64) string {
 		if n >= 1000000 && math.Mod(n, 1000000) == 0 {
 			return jsNum(n/1000000) + "M"
 		}
-		return jsToFixed(n/1000000, 1) + "M"
+		return strconv.FormatFloat(n/1000000, 'f', 1, 64) + "M"
 	}
 	if n >= 1000 && math.Mod(n, 1000) == 0 {
 		return jsNum(n/1000) + "k"
 	}
-	return jsToFixed(n/1000, 1) + "k"
+	return strconv.FormatFloat(n/1000, 'f', 1, 64) + "k"
 }
 
 // ---------- getFormatTimeline ----------
@@ -97,8 +80,8 @@ func formatTimeline(timestamp float64, unit string) string {
 	seconds := math.Floor(timestamp / 1000)
 	days := math.Floor(seconds / 86400)
 	weeks := math.Floor(days / 7)
-	months := jsToFixed(days/30, 0)
-	years := jsToFixed(days/365, 0)
+	months := strconv.FormatFloat(days/30, 'f', 0, 64)
+	years := strconv.FormatFloat(days/365, 'f', 0, 64)
 	switch unit {
 	case "day":
 		if days == 1 {
@@ -164,26 +147,4 @@ func d3TickFormat(t time.Time) string {
 		return t.Format("January") // formatMonth "%B"
 	}
 	return t.Format("2006") // formatYear "%Y"
-}
-
-// escapeXML 转义文本节点中的 XML 特殊字符
-func escapeXML(s string) string {
-	var b strings.Builder
-	for _, r := range s {
-		switch r {
-		case '&':
-			b.WriteString("&amp;")
-		case '<':
-			b.WriteString("&lt;")
-		case '>':
-			b.WriteString("&gt;")
-		case '"':
-			b.WriteString("&quot;")
-		case '\'':
-			b.WriteString("&apos;")
-		default:
-			b.WriteRune(r)
-		}
-	}
-	return b.String()
 }

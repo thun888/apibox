@@ -313,7 +313,7 @@ func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []stri
 		}
 	}
 
-	// 机会式清理过期行（本请求保存/复用的行已刷新 fetched_at，不会误删）
+	// 概率式清理过期行（见 store.go；本请求保存/复用的行已刷新 fetched_at，不会误删）
 	dbPurgeExpired(ctx)
 
 	out := make([]*repoStarData, 0, len(repos))

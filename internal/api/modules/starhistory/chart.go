@@ -1,11 +1,14 @@
 package starhistory
 
 // SVG 渲染器：在 Go 中复刻 star-history 前端 XYChart + drawAxis + drawLegend
-// + drawWatermark + ToolTip 在 JSDOM 里的输出结构（坐标、属性、样式序列化
-// 顺序均对齐），再经 svgo 优化后的体积特征已直接内联（无缩进、无冗余属性）。
+// + drawWatermark 的输出（坐标、属性与样式已按 svgo 优化后的特征直接内联：
+// 无缩进、无冗余属性）。JSDOM 初始 DOM 里的残留（隐藏 ToolTip、图例周围的
+// 空嵌套 <svg>、pointer-events 包装）不产生可见输出，已省略；d3-shape 中
+// 依赖重复 x 坐标的 JS 边界处理同样省略（星标日期唯一且升序，x 严格递增）。
 
 import (
 	"fmt"
+	"html"
 	"math"
 	"strings"
 	"time"
@@ -173,7 +176,7 @@ func renderChart(o renderOptions) string {
 
 	// 图表主 group
 	fmt.Fprintf(&b, `<g transform="translate(%s,%s)">`, jsNum(ml), jsNum(mt))
-	b.WriteString(`<g pointer-events="all">`)
+	b.WriteString(`<g>`)
 
 	// ---------- 水印 ----------
 	fmt.Fprintf(&b, `<text style="font-size: 16px; fill: #666666;" transform="translate(%s,%s)" text-anchor="middle">star-history.dera.page</text>`,
@@ -186,8 +189,9 @@ func renderChart(o renderOptions) string {
 	var xTicks []float64
 	var xTickLabels []string
 	if o.xTickLabelType == "Date" {
-		start := time.UnixMilli(int64(math.Round(minX)))
-		stop := time.UnixMilli(int64(math.Round(maxX)))
+		// 刻度固定按 UTC 对齐（见 d3ticks.go）
+		start := time.UnixMilli(int64(math.Round(minX))).UTC()
+		stop := time.UnixMilli(int64(math.Round(maxX))).UTC()
 		for _, t := range timeTicks(start, stop, 5) {
 			xTicks = append(xTicks, float64(t.UnixMilli()))
 			xTickLabels = append(xTickLabels, d3TickFormat(t))
@@ -215,7 +219,7 @@ func renderChart(o renderOptions) string {
 		jsNum(0.5), jsNum(0.5), jsNum(chartWidth+0.5), stroke)
 	for i, v := range xTicks {
 		fmt.Fprintf(&b, `<g class="tick" opacity="1" transform="translate(%s,0)"><line stroke="currentColor" y2="0"></line><text fill="currentColor" y="6" dy="0.71em" style="font-family: xkcd; font-size: 16px; fill: %s;">%s</text></g>`,
-			jsNum(xScale.apply(v)+0.5), stroke, escapeXML(xTickLabels[i]))
+			jsNum(xScale.apply(v)+0.5), stroke, html.EscapeString(xTickLabels[i]))
 	}
 	b.WriteString(`</g>`)
 
@@ -288,10 +292,8 @@ func renderChart(o renderOptions) string {
 		legendY = chartHeight - backgroundHeight - 15
 	}
 
-	b.WriteString(`<svg><svg>`)
 	fmt.Fprintf(&b, `<rect style="fill: %s;" fill-opacity="0.85" stroke="%s" stroke-width="2" rx="5" ry="5" filter="url(#xkcdify)" width="%s" height="%s" x="%s" y="%s"></rect>`,
 		bg, stroke, jsNum(backgroundWidth), jsNum(backgroundHeight), jsNum(legendX), jsNum(legendY))
-	b.WriteString(`</svg><svg>`)
 	for i, item := range o.datasets {
 		itemY := legendY + 12 + xkcdCharHeight*float64(i)
 		fmt.Fprintf(&b, `<rect style="fill: %s;" width="8" height="8" rx="2" ry="2" filter="url(#xkcdify)" x="%s" y="%s"></rect>`,
@@ -305,18 +307,11 @@ func renderChart(o renderOptions) string {
 		fmt.Fprintf(&b, `<text style="font-size: 15px; fill: %s;" x="%s" y="%s">%s</text>`,
 			stroke,
 			jsNum(legendX+legendXPadding+colorBlockWidth+boolFloat(shouldDrawLogo)*(legendXPadding+logoSize)+6),
-			jsNum(itemY+8), escapeXML(item.label))
+			jsNum(itemY+8), html.EscapeString(item.label))
 	}
-	b.WriteString(`</svg></svg>`)
 
 	b.WriteString(`</g>`) // svgChart
 	b.WriteString(`</g>`) // chart group
-
-	// ---------- 隐藏 ToolTip（构造时的初始 DOM，up_left @60,60） ----------
-	tipX := 60.0 - 25 - 20
-	tipY := 60.0 - 30 - 20
-	fmt.Fprintf(&b, `<svg x="%s" y="%s" style="visibility: hidden;"><rect style="fill: %s;" fill-opacity="0.9" stroke="%s" stroke-width="2" rx="5" ry="5" filter="url(#xkcdify)" width="25" height="30" x="5" y="5"></rect><text style="font-size: 15px; font-weight: bold; fill: %s;" x="15" y="25"></text></svg>`,
-		jsNum(tipX), jsNum(tipY), bg, stroke, stroke)
 
 	// ---------- 标题 ----------
 	if o.title != "" {
@@ -417,15 +412,12 @@ func logScaleTicks(maxValue float64) ([]float64, []string) {
 func monotonePath(data []xyPoint, xScale linearScale, yScale func(float64) float64) string {
 	var b strings.Builder
 	var x0, y0 float64
-	x1, y1 := math.NaN(), math.NaN() // JS 中初始 _x1/_y1 为 undefined（NaN 永不相等）
+	x1, y1 := math.NaN(), math.NaN() // 初始值不会被读取（首个点走 case 0）
 	var t0 float64
 	point := 0
 	started := false
 
 	emitPoint := func(x, y float64) {
-		if x == x1 && y == y1 {
-			return // 与上一点重合（JS 中 NaN 永不相等，初始 x1=NaN 不影响）
-		}
 		var t1 float64
 		switch point {
 		case 0:
@@ -474,41 +466,34 @@ func emitBezier(b *strings.Builder, x0, y0, x1, y1, t0, t1 float64) {
 		jsNum(x1), jsNum(y1))
 }
 
-// monotoneSlope3 移植 d3-shape 的 slope3（Fritsch–Carlson / Steffen 切线）
+// monotoneSlope3 移植 d3-shape 的 slope3（Fritsch–Carlson / Steffen 切线）。
+// 原 JS 实现有除 0/除 -0 的边界处理（h0 || h1<0 && -0），本模块数据 x 严格
+// 递增（日期聚合后唯一且升序），h0/h1 恒不为 0，直接省略该分支。
 func monotoneSlope3(x0, y0, x1, y1, x2, y2 float64) float64 {
-	// JS: (y1-y0)/(h0 || h1<0 && -0)，h0=0 且 h1<0 时除 -0，其余除 0/false
-	den := func(h0, h1 float64) float64 {
-		if h0 != 0 {
-			return h0
-		}
-		if h1 < 0 {
-			return math.Copysign(0, -1)
-		}
-		return 0
-	}
 	h0 := x1 - x0
 	h1 := x2 - x1
-	s0 := (y1 - y0) / den(h0, h1)
-	s1 := (y2 - y1) / den(h1, h0)
+	s0 := (y1 - y0) / h0
+	s1 := (y2 - y1) / h1
 	p := (s0*h1 + s1*h0) / (h0 + h1)
-	sign := func(x float64) float64 {
-		if x < 0 {
-			return -1
-		}
-		return 1
+	// 复刻 JS sign(s0)+sign(s1)：负数记 -1，其余（含 0）记 +1
+	signs := 1.0
+	if s0 < 0 {
+		signs = -1
 	}
-	r := (sign(s0) + sign(s1)) * math.Min(math.Min(math.Abs(s0), math.Abs(s1)), 0.5*math.Abs(p))
+	if s1 < 0 {
+		signs -= 1
+	} else {
+		signs += 1
+	}
+	r := signs * math.Min(math.Min(math.Abs(s0), math.Abs(s1)), 0.5*math.Abs(p))
 	if r == 0 || math.IsNaN(r) {
 		return 0 // JS: ... || 0
 	}
 	return r
 }
 
-// monotoneSlope2 移植 d3-shape 的 slope2
+// monotoneSlope2 移植 d3-shape 的 slope2。x 严格递增保证 h != 0，省略原
+// JS 的 h==0 回退。
 func monotoneSlope2(x0, y0, x1, y1, t float64) float64 {
-	h := x1 - x0
-	if h != 0 {
-		return (3*(y1-y0)/h - t) / 2
-	}
-	return t
+	return (3*(y1-y0)/(x1-x0) - t) / 2
 }

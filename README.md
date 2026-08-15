@@ -14,7 +14,7 @@
 | [qqmail_head](https://github.com/thun888/qq-mail-head) | `/api/qqmail_head` | 获取 QQ 邮箱头像 | CookieCloud（必需） |
 | [starvote](https://github.com/xaoxuu/star-vote) | `/api/starvote` | 投票与评分 | 数据库 |
 | [genlineanimation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/genlineanimation` | 生成手写签名动画 SVG | 无 |
-| [starhistory](https://github.com/Mubelotix/star-history)（移植） | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
+| [starhistory](https://github.com/Mubelotix/star-history) | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
 
 模块默认启用，可通过 `modules.<name>.enable: false` 关闭（见[配置](#配置)）。
 

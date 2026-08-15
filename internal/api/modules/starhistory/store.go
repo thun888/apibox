@@ -12,6 +12,7 @@ package starhistory
 import (
 	"context"
 	"encoding/json"
+	"math/rand/v2"
 	"time"
 
 	"gorm.io/gorm/clause"
@@ -20,6 +21,9 @@ import (
 )
 
 const tablePrefix = "starhistory_"
+
+// purgeExpiredRate dbPurgeExpired 每次调用的触发概率（约每 100 次请求清理一次）
+const purgeExpiredRate = 0.01
 
 // StarDataCache 星标数据缓存表模型
 type StarDataCache struct {
@@ -89,9 +93,10 @@ func dbSaveStarData(ctx context.Context, data *repoStarData) {
 	}
 }
 
-// dbPurgeExpired 机会式清理过期缓存行（失败仅记警告）。
+// dbPurgeExpired 概率式清理过期缓存行（purgeExpiredRate 触发，失败仅记警告）。
+// 低频触发即可满足清理需求，避免每个请求都多跑一次 DELETE。
 func dbPurgeExpired(ctx context.Context) {
-	if database.DB == nil {
+	if database.DB == nil || rand.Float64() >= purgeExpiredRate {
 		return
 	}
 	if err := database.DB.WithContext(ctx).
