@@ -17,7 +17,7 @@
 | [siteinfo](https://github.com/xaoxuu/site-info-api) | `/api/siteinfo` | 抓取网页标题/描述/图标 | Redis（可选） |
 | [starhistory](https://github.com/Mubelotix/star-history) | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
 
-模块默认启用，可通过 `modules.<name>.enable: false` 关闭（见[配置](#配置)）。
+模块默认禁用，可通过 `modules.<name>.enable: true` 开启（见[配置](#配置)）。
 
 ## 快速开始
 
@@ -308,8 +308,8 @@ Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白�
 **starhistory 返回 404？**
 2026-06-30 起 GitHub 将 stargazers API 限制为仓库管理员/协作者可见，因此只能生成本人拥有/协作仓库的图表（其他仓库返回 `Repo not found in dataset`）；星标记录少于 5 条的仓库同样返回 404。
 
-**如何禁用某个模块？**
-在 `config.yaml` 中设置 `modules.<name>.enable: false`，该模块的路由将不会注册。
+**如何启用/禁用某个模块？**
+模块默认禁用，在 `config.yaml` 中设置 `modules.<name>.enable: true` 才会注册该模块的路由；设为 `false` 或删除该字段则不会注册。
 
 **qqmail_head 返回 500？**
 

@@ -70,7 +70,7 @@ type SecretsConfig struct {
 
 // CookieCloudConfig CookieCloud 服务配置（共享基础设施，非 API 模块）
 type CookieCloudConfig struct {
-	Enable     *bool  `yaml:"enable"` // 未配置时默认启用
+	Enable     *bool  `yaml:"enable"` // 未配置时默认禁用
 	Host       string `yaml:"host"`
 	UUID       string `yaml:"uuid"`
 	Password   string `yaml:"password"`
@@ -78,62 +78,62 @@ type CookieCloudConfig struct {
 }
 
 // Enabled 是否启用
-func (c *CookieCloudConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *CookieCloudConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // BiliInfoConfig Bilibili 信息模块配置
 type BiliInfoConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	Enable          *bool    `yaml:"enable"` // 未配置时默认禁用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // Enabled 模块是否启用
-func (c *BiliInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *BiliInfoConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // QQMailHeadConfig QQ 邮箱头像模块配置
 type QQMailHeadConfig struct {
-	Enable *bool `yaml:"enable"` // 未配置时默认启用
+	Enable *bool `yaml:"enable"` // 未配置时默认禁用
 }
 
 // Enabled 模块是否启用
-func (c *QQMailHeadConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *QQMailHeadConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // StarVoteConfig 投票/评分模块配置
 type StarVoteConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	Enable          *bool    `yaml:"enable"` // 未配置时默认禁用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // Enabled 模块是否启用
-func (c *StarVoteConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *StarVoteConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // GenLineAnimationConfig 手写签名动画模块配置
 type GenLineAnimationConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	Enable          *bool    `yaml:"enable"` // 未配置时默认禁用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // Enabled 模块是否启用
-func (c *GenLineAnimationConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *GenLineAnimationConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // StarHistoryConfig 星标历史图表模块配置
 // 说明：SVG 图表通常内嵌于 README 等场景（无 Referer），故不做来源校验；
 // 数据来自 GitHub stargazers API（2026-06-30 起仅仓库管理员/协作者可访问，
 // 需 secrets.github_token），经 Redis 缓存（24h）。
 type StarHistoryConfig struct {
-	Enable *bool `yaml:"enable"` // 未配置时默认启用
+	Enable *bool `yaml:"enable"` // 未配置时默认禁用
 }
 
 // Enabled 模块是否启用
-func (c *StarHistoryConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *StarHistoryConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // SiteInfoConfig 站点信息模块配置
 type SiteInfoConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认启用
+	Enable          *bool    `yaml:"enable"` // 未配置时默认禁用
 	AllowedReferers []string `yaml:"allowed_referers"`
 }
 
 // Enabled 模块是否启用
-func (c *SiteInfoConfig) Enabled() bool { return c.Enable == nil || *c.Enable }
+func (c *SiteInfoConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // Load 加载配置文件，默认查找执行目录下的 config.yaml
 func Load(path ...string) (*Config, error) {
