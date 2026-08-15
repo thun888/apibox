@@ -143,13 +143,11 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 |------|------|------|
 | url | 必填 | 目标网页 URL（仅 http/https） |
 | type | `site` | 兼容参数，仅接受 `site`，其余值返回 `{}` |
-| base64 | 无 | 为 `1`/`true` 时抓取图标转 data URL，填入 `iconBase64` |
+| embedIcon | 无 | 为 `1`/`true` 时抓取图标转 data URL，填入 `iconBase64` |
 
 - 返回 `{"title","desc","icon","iconBase64","url"}`，字段缺省省略；未提取到任何信息或上游失败返回 `{}`。
 
 #### `GET /api/siteinfo/icon` — 站点图标二进制
-
-由原版 `pureicon=1` 查询参数拆分而来。
 
 | 参数 | 缺省 | 说明 |
 |------|------|------|
@@ -160,15 +158,15 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 
 #### 共同行为
 
-- 图标选择顺序：`rel=apple-touch-icon` → `rel=icon` → `og:image` → `twitter:image` → 其他含 icon 的 link；相对路径按页面最终 URL 解析（原版会丢失路径基准）；`data:`/`javascript:` 等非 http(s) 结果丢弃。
-- 站点信息与图标本体均 Redis 缓存 30 天（图标超过 2MB 不缓存，直接转发）；响应头 `Cache-Control: public, max-age=604800`（与原版 CDN 头一致）。
-- 抓取超时 15s、HTML 上限 2MB、跟随重定向上限 10 次（原版无超时、无上限）。
+- 图标选择顺序：`rel=apple-touch-icon` → `rel=icon` → `og:image` → `twitter:image` → 其他含 icon 的 link；相对路径按页面最终 URL 解析；`data:`/`javascript:` 等非 http(s) 结果丢弃。
+- 站点信息与图标本体均 Redis 缓存 30 天（图标超过 2MB 不缓存，直接跳转）；响应头 `Cache-Control: public, max-age=604800`（与原版 CDN 头一致）。
+- 抓取超时 15s、HTML 上限 2MB、跟随重定向上限 10 次。
 - 403（Referer 不在白名单）。
 
 示例：
 
 ```bash
-curl "http://localhost:8080/api/siteinfo/info?url=https://github.com/thun888/apibox&base64=1" \
+curl "http://localhost:8080/api/siteinfo/info?url=https://github.com/thun888/apibox&embedIcon=1" \
   -H "Referer: http://localhost:4000/"
 
 curl -o icon.png "http://localhost:8080/api/siteinfo/icon?url=https://github.com/thun888/apibox" \

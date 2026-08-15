@@ -1,6 +1,6 @@
 // Package siteinfo 网页信息抓取（site-info-api 移植）：
 //
-//	GET /api/siteinfo/info?url=...&base64=1   站点信息 JSON
+//	GET /api/siteinfo/info?url=...&embedIcon=1   站点信息 JSON
 //	GET /api/siteinfo/icon?url=...            站点图标二进制代理
 //
 // 相比原版：仅保留 site 类型（type 参数兼容）、修复相对 icon 解析与
@@ -153,8 +153,8 @@ func parseTarget(raw string) (*url.URL, bool) {
 	return u, true
 }
 
-// handle GET /api/siteinfo/info?url=...&type=site&base64=1
-// type 只接受 site（其余值返回 {}）；base64=1|true 时抓取图标转 data
+// handle GET /api/siteinfo/info?url=...&type=site&embedIcon=1
+// type 只接受 site（其余值返回 {}）；embedIcon=1|true 时抓取图标转 data
 // URL 填入 iconBase64；未提取到任何信息、url 非法或上游失败均返回 {}。
 func handle(ctx *gin.Context) {
 	if !checkAllowed(ctx) {
@@ -173,7 +173,7 @@ func handle(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, gin.H{})
 		return
 	}
-	needBase64 := isTruthy(ctx.Query("base64"))
+	needBase64 := isTruthy(ctx.Query("embedIcon"))
 
 	cacheKey := siteDataCacheKey(normalizeTarget(u), needBase64)
 
