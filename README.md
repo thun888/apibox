@@ -161,6 +161,7 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 - 图标选择顺序：`rel=apple-touch-icon` → `rel=icon` → `og:image` → `twitter:image` → 其他含 icon 的 link；相对路径按页面最终 URL 解析；`data:`/`javascript:` 等非 http(s) 结果丢弃。
 - 站点信息与图标本体均 Redis 缓存 30 天（图标超过 2MB 不缓存，直接跳转）；响应头 `Cache-Control: public, max-age=604800`（与原版 CDN 头一致）。
 - 抓取超时 15s、HTML 上限 2MB、跟随重定向上限 10 次。
+- 可选上游代理（`modules.siteinfo.proxy`）：目标域名命中规则中的 `domains`（精确域名或 `*.example.com` 通配、`*` 表示全部，端口不参与匹配）时，页面与图标抓取改走 `template` 代理地址，`{href}` 原样替换为目标 URL（不额外编码，适合 `https://proxy.example.com/{href}` 风格的前缀代理）；重定向目标命中规则时同样改写，图标超限 302 的跳转地址也会改写为代理地址。命中代理后不再校验目标主机（连接由代理发起），但代理地址本身须为公网 http(s)。
 - 403（Referer 不在白名单）。
 
 示例：

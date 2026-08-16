@@ -128,8 +128,19 @@ func (c *StarHistoryConfig) Enabled() bool { return c.Enable != nil && *c.Enable
 
 // SiteInfoConfig 站点信息模块配置
 type SiteInfoConfig struct {
-	Enable          *bool    `yaml:"enable"` // 未配置时默认禁用
-	AllowedReferers []string `yaml:"allowed_referers"`
+	Enable          *bool                 `yaml:"enable"` // 未配置时默认禁用
+	AllowedReferers []string              `yaml:"allowed_referers"`
+	Proxy           []SiteInfoProxyConfig `yaml:"proxy"` // 上游代理规则，可选
+}
+
+// SiteInfoProxyConfig 站点信息模块的上游代理规则：目标域名命中 Domains
+// 时，实际请求改走 Template 代理地址。Template 为代理 URL 模板，其中的
+// {href} 会在请求前被原样替换为目标 URL（不额外编码）；Domains 支持
+// 精确域名（大小写不敏感）与 "*.example.com" 通配（命中域名本身及其任意
+// 子域），"*" 表示匹配所有域名；端口不参与匹配。
+type SiteInfoProxyConfig struct {
+	Template string   `yaml:"template"`
+	Domains  []string `yaml:"domains"`
 }
 
 // Enabled 模块是否启用

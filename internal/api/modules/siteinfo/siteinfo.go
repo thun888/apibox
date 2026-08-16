@@ -7,7 +7,9 @@
 // rel 匹配、抓取带超时与体积上限、Redis 缓存 30 天（站点元数据，缓存
 // key 按规范化 URL 构建）、icon 接口不落 Redis 直接转发（<2MB，超限
 // 302 跳转原图地址）、SSRF 防护
-// （拦截解析到内网/环回/链路本地等保留地址的目标，含重定向目标）。
+// （拦截解析到内网/环回/链路本地等保留地址的目标，含重定向目标）、
+// 可选上游代理（modules.siteinfo.proxy，域名命中时经模板代理请求，
+// 见 proxy.go）。
 package siteinfo
 
 import (
@@ -308,7 +310,7 @@ func serveIcon(ctx *gin.Context, iconURL string) {
 	// 上游已声明体积超限时直接 302，避免白拉大对象
 	if resp.ContentLength >= maxIconSize {
 		setCDNCache(ctx)
-		ctx.Redirect(http.StatusFound, iconURL)
+		ctx.Redirect(http.StatusFound, iconRedirectURL(ctx.Request.Context(), iconURL))
 		return
 	}
 
@@ -324,7 +326,7 @@ func serveIcon(ctx *gin.Context, iconURL string) {
 	}
 	if len(body) >= maxIconSize { // 读到上限说明体积 >= 2MB，302 跳转原地址
 		setCDNCache(ctx)
-		ctx.Redirect(http.StatusFound, iconURL)
+		ctx.Redirect(http.StatusFound, iconRedirectURL(ctx.Request.Context(), iconURL))
 		return
 	}
 

@@ -65,3 +65,12 @@ modules:
     allowed_referers:
       - "localhost:4000"
       - "localhost:5000"
+    # 可选：上游代理规则。目标域名命中 domains 时，请求改走 template 代理地址。
+    #   template: 代理 URL 模板，{href} 在请求前被原样替换为目标 URL（不额外编码）
+    #   domains:  精确域名（大小写不敏感）或 "*.example.com" 通配（命中域名本身
+    #             及其任意子域）；"*" 表示所有域名；端口不参与匹配
+    proxy:
+      - template: "https://proxy.example.com/{href}"
+        domains:
+          - "example.com"
+          - "*.example.org"

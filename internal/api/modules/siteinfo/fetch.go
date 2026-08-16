@@ -1,7 +1,8 @@
 package siteinfo
 
 // 上游抓取与 HTML 解析：15s 超时、HTML 限 2MB、自动跟随重定向（上限10 次），解析用 golang.org/x/net/html。
-// SSRF 防护：抓取前及每次重定向均校验目标主机，拦截解析到内网/环回/链路本地等保留地址的目标。
+// SSRF 防护：直连目标在抓取前及每次重定向均校验主机，拦截解析到内网/环回/链路本地等保留地址的目标。
+// 命中代理规则的域名改经代理请求（见 proxy.go），重定向目标命中时同样改写，此时不再校验目标主机。
 
 import (
 	"context"
@@ -33,6 +34,8 @@ var httpClient = &http.Client{
 
 // checkRedirect 校验重定向目标（SSRF 防护）：超过 10 跳、非 http(s) 协议、
 // 或主机解析到内网/环回/链路本地等保留地址时拒绝跟随。
+// 命中代理规则的域名不改直连：记录真实地址（供响应后还原页面最终 URL），
+// 并把请求改写为代理地址；代理地址本身的校验由 resolveProxy 完成。
 func checkRedirect(req *http.Request, via []*http.Request) error {
 	if len(via) >= 10 {
 		return fmt.Errorf("stopped after 10 redirects")
@@ -40,8 +43,19 @@ func checkRedirect(req *http.Request, via []*http.Request) error {
 	if s := req.URL.Scheme; s != "http" && s != "https" {
 		return fmt.Errorf("redirect to unsupported scheme %q", s)
 	}
-	if utils.IsUnsafeHost(req.Context(), req.URL.Hostname()) {
+	pu, viaProxy, err := resolveProxy(req.Context(), req.URL)
+	if err != nil {
+		return err
+	}
+	if !viaProxy && unsafeHost(req.Context(), req.URL.Hostname()) {
 		return fmt.Errorf("%w: redirect target %s", utils.ErrUnsafeHost, req.URL.Hostname())
+	}
+	// 无论是否经代理都记录真实地址：直连响应用 resp.Request.URL 即最终
+	// URL，代理响应需要它还原页面最终 URL 作为相对链接解析基准。
+	ctx := context.WithValue(req.Context(), realURLCtxKey{}, req.URL.String())
+	*req = *req.WithContext(ctx)
+	if viaProxy {
+		req.URL = pu
 	}
 	return nil
 }
@@ -57,11 +71,23 @@ func fetchSiteInfo(ctx context.Context, target *url.URL) (siteData, error) {
 	return out, nil
 }
 
+// realURLCtxKey 标记经代理请求时的真实目标地址：初始请求在 fetchHTML
+// 记录、每次重定向在 checkRedirect 更新，供响应后还原页面最终 URL。
+type realURLCtxKey struct{}
+
 func fetchHTML(ctx context.Context, target *url.URL) (string, *url.URL, error) {
-	if utils.IsUnsafeHost(ctx, target.Hostname()) {
-		return "", nil, fmt.Errorf("%w: %s", utils.ErrUnsafeHost, target.Hostname())
+	pu, viaProxy, err := resolveProxy(ctx, target)
+	if err != nil {
+		return "", nil, err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, target.String(), nil)
+	if !viaProxy {
+		if unsafeHost(ctx, target.Hostname()) {
+			return "", nil, fmt.Errorf("%w: %s", utils.ErrUnsafeHost, target.Hostname())
+		}
+	} else {
+		ctx = context.WithValue(ctx, realURLCtxKey{}, target.String())
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pu.String(), nil)
 	if err != nil {
 		return "", nil, err
 	}
@@ -79,8 +105,15 @@ func fetchHTML(ctx context.Context, target *url.URL) (string, *url.URL, error) {
 	if err != nil {
 		return "", nil, err
 	}
-	// resp.Request.URL 为跟随重定向后的最终 URL，作为相对路径解析基准
-	return string(body), resp.Request.URL, nil
+	// 页面最终 URL：经代理时从上下文还原真实地址（代理地址不可作为相对
+	// 路径解析基准）；无代理时 resp.Request.URL 即跟随重定向后的最终 URL。
+	base := resp.Request.URL
+	if real, ok := resp.Request.Context().Value(realURLCtxKey{}).(string); ok {
+		if u, err := url.Parse(real); err == nil {
+			base = u
+		}
+	}
+	return string(body), base, nil
 }
 
 // parseInfo 提取 title/desc/icon，优先级：
@@ -228,10 +261,14 @@ func fetchIcon(ctx context.Context, iconURL string) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-	if utils.IsUnsafeHost(ctx, u.Hostname()) {
+	pu, viaProxy, err := resolveProxy(ctx, u)
+	if err != nil {
+		return nil, err
+	}
+	if !viaProxy && unsafeHost(ctx, u.Hostname()) {
 		return nil, fmt.Errorf("%w: %s", utils.ErrUnsafeHost, u.Hostname())
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, iconURL, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, pu.String(), nil)
 	if err != nil {
 		return nil, err
 	}
