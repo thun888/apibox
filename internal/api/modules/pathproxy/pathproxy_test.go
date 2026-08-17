@@ -1,0 +1,224 @@
+package pathproxy
+
+import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+
+	"github.com/thun888/apibox/internal/config"
+)
+
+func TestCompileRulesMatches(t *testing.T) {
+	rules := compileRules([]config.PathProxyRuleConfig{
+		{Path: "/api1/users", Target: "https://api.example.com/users"},
+		{Path: "/api2/*", Target: "https://api.example.com/"},
+		{Path: "/api3/*", Target: "https://api.example.com/base/"},
+		{Path: "/bad*", Target: "https://api.example.com"}, // 不支持的 * 位置，整条忽略
+	})
+	if len(rules) != 3 {
+		t.Fatalf("len(rules) = %d, want 3", len(rules))
+	}
+	if _, ok := rules[0].match("/api1/users"); !ok {
+		t.Error("exact rule should match")
+	}
+	if _, ok := rules[0].match("/api1/users/extra"); ok {
+		t.Error("exact rule should not match extra path")
+	}
+	if rest, ok := rules[1].match("/api2/a/b"); !ok || rest != "/a/b" {
+		t.Errorf("wildcard match = (%q, %v), want (/a/b, true)", rest, ok)
+	}
+	if rest, ok := rules[1].match("/api2"); !ok || rest != "" {
+		t.Errorf("wildcard prefix match = (%q, %v), want (\"\", true)", rest, ok)
+	}
+	if _, ok := rules[1].match("/api2x"); ok {
+		t.Error("wildcard should not match /api2x")
+	}
+	if rest, ok := rules[2].match("/api3"); !ok || rest != "" {
+		t.Errorf("prefix-only wildcard match = (%q, %v), want (\"\", true)", rest, ok)
+	}
+}
+
+func TestJoinURLPath(t *testing.T) {
+	tests := []struct {
+		base, rest, want string
+	}{
+		{"", "/users", "/users"},
+		{"/", "/users", "/users"},
+		{"/base", "/users", "/base/users"},
+		{"/base/", "/users", "/base/users"},
+		{"/base/", "", "/base/"},
+	}
+	for _, tt := range tests {
+		if got := joinURLPath(tt.base, tt.rest); got != tt.want {
+			t.Errorf("joinURLPath(%q, %q) = %q, want %q", tt.base, tt.rest, got, tt.want)
+		}
+	}
+}
+
+func runRequestWithCfg(t *testing.T, cfg *config.Config, method, target string) *httptest.ResponseRecorder {
+	t.Helper()
+	old := config.Cfg
+	config.Cfg = cfg
+	defer func() { config.Cfg = old }()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	ctrl := &Controller{}
+	g := r.Group("/api/" + ctrl.ModuleName())
+	ctrl.Register(g)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(method, target, nil)
+	req.Header.Set("Referer", "http://localhost:4000/")
+	r.ServeHTTP(w, req)
+	return w
+}
+
+func TestExactRuleProxies(t *testing.T) {
+	var gotPath, gotQuery, gotAuth string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotQuery = r.URL.RawQuery
+		gotAuth = r.Header.Get("Authentication")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"ok":true}`))
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable:          &enable,
+				AllowedReferers: []string{"localhost:4000"},
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api1/users", Target: upstream.URL + "/users", Headers: map[string]string{"Authentication": "Bearer tok"}},
+				},
+			},
+		},
+	}
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api1/users?x=1")
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	if gotPath != "/users" {
+		t.Errorf("upstream path = %q, want /users", gotPath)
+	}
+	if gotQuery != "x=1" {
+		t.Errorf("upstream query = %q, want x=1", gotQuery)
+	}
+	if gotAuth != "Bearer tok" {
+		t.Errorf("upstream auth = %q, want Bearer tok", gotAuth)
+	}
+}
+
+func TestWildcardRuleProxies(t *testing.T) {
+	var gotPath string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable:          &enable,
+				AllowedReferers: []string{"localhost:4000"},
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api2/*", Target: upstream.URL + "/base/"},
+				},
+			},
+		},
+	}
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api2/users/42")
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("code = %d, want 204", w.Code)
+	}
+	if gotPath != "/base/users/42" {
+		t.Errorf("upstream path = %q, want /base/users/42", gotPath)
+	}
+}
+
+func TestNoMatchReturns404(t *testing.T) {
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable:          &enable,
+				AllowedReferers: []string{"localhost:4000"},
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api1/users", Target: "https://api.example.com/users"},
+				},
+			},
+		},
+	}
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/other")
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("code = %d, want 404", w.Code)
+	}
+}
+
+func TestRefererForbidden(t *testing.T) {
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable:          &enable,
+				AllowedReferers: []string{"localhost:4000"},
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api1/users", Target: "https://api.example.com/users"},
+				},
+			},
+		},
+	}
+	old := config.Cfg
+	config.Cfg = cfg
+	defer func() { config.Cfg = old }()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	ctrl := &Controller{}
+	g := r.Group("/api/" + ctrl.ModuleName())
+	ctrl.Register(g)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/pathproxy/api1/users", nil)
+	req.Header.Set("Referer", "http://evil.example/")
+	r.ServeHTTP(w, req)
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("code = %d, want 403", w.Code)
+	}
+}
+
+func TestWildcardRulePreservesEscapedPath(t *testing.T) {
+	var gotEscaped string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotEscaped = r.URL.EscapedPath()
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable:          &enable,
+				AllowedReferers: []string{"localhost:4000"},
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api2/*", Target: upstream.URL + "/base/"},
+				},
+			},
+		},
+	}
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api2/a%2Fb")
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("code = %d, want 204", w.Code)
+	}
+	if gotEscaped != "/base/a%2Fb" {
+		t.Errorf("upstream escaped path = %q, want /base/a%%2Fb", gotEscaped)
+	}
+}

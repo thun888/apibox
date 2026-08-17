@@ -15,6 +15,7 @@
 | [starvote](https://github.com/xaoxuu/star-vote) | `/api/starvote` | 投票与评分 | 数据库 |
 | [genlineanimation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/genlineanimation` | 生成手写签名动画 SVG | 无 |
 | [siteinfo](https://github.com/xaoxuu/site-info-api) | `/api/siteinfo` | 抓取网页标题/描述/图标 | Redis（可选） |
+| pathproxy | `/api/pathproxy` | 按路径规则反向代理到目标上游 | 无 |
 | [starhistory](https://github.com/Mubelotix/star-history) | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
 
 模块默认禁用，可通过 `modules.<name>.enable: true` 开启（见[配置](#配置)）。
@@ -132,6 +133,25 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 | color | `#000000` | 笔画颜色 |
 
 返回 SVG（`image/svg+xml`），响应头 `Cache-Control: public, max-age=31536000`。
+
+### pathproxy — 路径代理
+
+`/api/pathproxy/<path>`，支持任意 HTTP 方法。
+
+按 `modules.pathproxy.path_rules` 规则把请求转发到目标上游：
+
+- `path`：模块前缀 `/api/pathproxy` 之后的路径，支持精确匹配（如 `/api1/users`）与末尾 `*` 通配（如 `/api2/*`）。通配命中后，通配部分会拼接到 `target` 的路径之后。
+- `target`：目标上游 URL（http/https），如 `https://api.example.com/users` 或 `https://api.example.com/`。
+- `headers`：可选，转发时额外设置或覆盖的上游请求头。
+- 请求方法、查询参数与请求体原样转发；查询参数会与 `target` 中已有的 query 合并。
+- 未命中任何规则返回 404；上游失败返回 502；Referer 不在白名单返回 403。
+
+示例：
+
+```bash
+curl "http://localhost:8080/api/pathproxy/api1/users?active=1" \
+  -H "Referer: http://localhost:4000/"
+```
 
 ### siteinfo — 网页站点信息
 
@@ -252,7 +272,7 @@ func RegisterController(c Controller)
 
 ## 安全
 
-- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
+- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo、pathproxy 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
 - **CORS**：`server.allowed_origins`。包含 `"*"` 时允许任意 Origin（回显请求 Origin，配合 Credentials 不能直接返回 `*`）；否则按列表精确匹配。
 - **可信代理**：`server.trusted_proxies` 传给 gin 的 `SetTrustedProxies`，影响 `c.ClientIP()`。
 

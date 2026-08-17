@@ -74,3 +74,17 @@ modules:
         domains:
           - "example.com"
           - "*.example.org"
+  pathproxy:
+    enable: true
+    allowed_referers:
+      - "localhost:4000"
+      - "localhost:5000"
+    path_rules:
+      - path: "/api1/users"
+        target: "https://api.example.com/users"
+        headers:
+          Authentication: "Bearer your-token"
+      - path: "/api2/*"
+        target: "https://api.example.com/"
+        headers:
+          Authentication: "Bearer your-token"
