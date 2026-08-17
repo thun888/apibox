@@ -283,3 +283,60 @@ func TestWildcardRulePreservesEscapedPath(t *testing.T) {
 		t.Errorf("upstream escaped path = %q, want /base/a%%2Fb", gotEscaped)
 	}
 }
+
+func TestPathProxyStripsUpstreamCORSHeaders(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		w.Header().Set("Access-Control-Allow-Methods", "GET")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable: &enable,
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/raw/*", Target: upstream.URL + "/", AllowedReferers: []string{"*"}},
+				},
+			},
+		},
+	}
+
+	old := config.Cfg
+	config.Cfg = cfg
+	defer func() { config.Cfg = old }()
+
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	// 模拟全局 CORS 中间件已写入本服务自己的 CORS 响应头
+	r.Use(func(c *gin.Context) {
+		c.Header("Access-Control-Allow-Origin", "https://blog.hzchu.top")
+		c.Next()
+	})
+	ctrl := &Controller{}
+	g := r.Group("/api/" + ctrl.ModuleName())
+	ctrl.Register(g)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/pathproxy/raw/thun888/Friend-Circle/file.json", nil)
+	req.Header.Set("Referer", "https://blog.hzchu.top/")
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("code = %d, want 200", w.Code)
+	}
+	values := w.Header().Values("Access-Control-Allow-Origin")
+	if len(values) != 1 || values[0] != "https://blog.hzchu.top" {
+		t.Fatalf("Access-Control-Allow-Origin = %v, want exactly [https://blog.hzchu.top]", values)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Credentials"); got != "" {
+		t.Errorf("upstream Access-Control-Allow-Credentials should be stripped, got %q", got)
+	}
+	if got := w.Header().Get("Access-Control-Allow-Methods"); got != "" {
+		t.Errorf("upstream Access-Control-Allow-Methods should be stripped, got %q", got)
+	}
+}

@@ -225,6 +225,7 @@ func (c *Controller) handle(ctx *gin.Context) {
 	ctx.Request = ctx.Request.WithContext(reqCtx)
 
 	proxy := &httputil.ReverseProxy{
+		ModifyResponse: stripUpstreamCORSHeaders,
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			// 目标 URL 已经包含最终路径，不能使用 SetURL（它会再次拼接
 			// 原始请求路径），这里直接覆盖 outbound URL 各字段。
@@ -260,6 +261,27 @@ func pathProxyErrorHandler(w http.ResponseWriter, r *http.Request, err error) {
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 	w.WriteHeader(http.StatusBadGateway)
 	_, _ = w.Write([]byte(`{"error":"upstream error"}`))
+}
+
+// stripUpstreamCORSHeaders 删除上游响应中的 CORS 头。全局 CORS 中间件
+// 已经按本服务配置写好 CORS 响应头；如果上游也返回 CORS 头（如
+// raw.githubusercontent.com 返回 Access-Control-Allow-Origin: *），
+// ReverseProxy 会叠加成多个值，浏览器会拒绝该响应。
+func stripUpstreamCORSHeaders(resp *http.Response) error {
+	for _, key := range corsResponseHeaders {
+		resp.Header.Del(key)
+	}
+	return nil
+}
+
+var corsResponseHeaders = []string{
+	"Access-Control-Allow-Origin",
+	"Access-Control-Allow-Credentials",
+	"Access-Control-Allow-Methods",
+	"Access-Control-Allow-Headers",
+	"Access-Control-Expose-Headers",
+	"Access-Control-Max-Age",
+	"Access-Control-Allow-Private-Network",
 }
 
 // mergeQuery 合并 target 自带 query 与请求 query；均为空时返回空串。
