@@ -136,9 +136,8 @@ type SiteInfoConfig struct {
 
 // PathProxyConfig 路径代理模块配置
 type PathProxyConfig struct {
-	Enable          *bool                 `yaml:"enable"` // 未配置时默认禁用
-	AllowedReferers []string              `yaml:"allowed_referers"`
-	PathRules       []PathProxyRuleConfig `yaml:"path_rules"`
+	Enable    *bool                 `yaml:"enable"` // 未配置时默认禁用
+	PathRules []PathProxyRuleConfig `yaml:"path_rules"`
 }
 
 // Enabled 模块是否启用
@@ -146,12 +145,14 @@ func (c *PathProxyConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // PathProxyRuleConfig 路径代理单条规则配置。
 // 客户端请求路径为 /api/pathproxy/<path>，path 为模块前缀之后的路径，
-// 支持精确匹配与末尾 "*" 通配；target 为目标上游 URL；headers 为转发时
-// 额外设置/覆盖的上游请求头。
+// 支持精确匹配与末尾 "*" 通配；target 为目标上游 URL；allowed_referers
+// 为当前规则单独的 Referer 白名单；headers 为转发时额外设置/覆盖的
+// 上游请求头。
 type PathProxyRuleConfig struct {
-	Path    string            `yaml:"path"`
-	Target  string            `yaml:"target"`
-	Headers map[string]string `yaml:"headers"`
+	Path            string            `yaml:"path"`
+	Target          string            `yaml:"target"`
+	AllowedReferers []string          `yaml:"allowed_referers"`
+	Headers         map[string]string `yaml:"headers"`
 }
 
 // SiteInfoProxyConfig 站点信息模块的上游代理规则：目标域名命中 Domains

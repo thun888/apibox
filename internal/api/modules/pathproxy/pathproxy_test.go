@@ -12,7 +12,7 @@ import (
 
 func TestCompileRulesMatches(t *testing.T) {
 	rules := compileRules([]config.PathProxyRuleConfig{
-		{Path: "/api1/users", Target: "https://api.example.com/users"},
+		{Path: "/api1/users", Target: "https://api.example.com/users", AllowedReferers: []string{"localhost:4000"}},
 		{Path: "/api2/*", Target: "https://api.example.com/"},
 		{Path: "/api3/*", Target: "https://api.example.com/base/"},
 		{Path: "/bad*", Target: "https://api.example.com"}, // 不支持的 * 位置，整条忽略
@@ -58,6 +58,10 @@ func TestJoinURLPath(t *testing.T) {
 }
 
 func runRequestWithCfg(t *testing.T, cfg *config.Config, method, target string) *httptest.ResponseRecorder {
+	return runRequestWithCfgAndReferer(t, cfg, method, target, "http://localhost:4000/")
+}
+
+func runRequestWithCfgAndReferer(t *testing.T, cfg *config.Config, method, target, referer string) *httptest.ResponseRecorder {
 	t.Helper()
 	old := config.Cfg
 	config.Cfg = cfg
@@ -71,7 +75,7 @@ func runRequestWithCfg(t *testing.T, cfg *config.Config, method, target string) 
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(method, target, nil)
-	req.Header.Set("Referer", "http://localhost:4000/")
+	req.Header.Set("Referer", referer)
 	r.ServeHTTP(w, req)
 	return w
 }
@@ -91,10 +95,9 @@ func TestExactRuleProxies(t *testing.T) {
 	cfg := &config.Config{
 		Modules: config.ModulesConfig{
 			PathProxy: config.PathProxyConfig{
-				Enable:          &enable,
-				AllowedReferers: []string{"localhost:4000"},
+				Enable: &enable,
 				PathRules: []config.PathProxyRuleConfig{
-					{Path: "/api1/users", Target: upstream.URL + "/users", Headers: map[string]string{"Authentication": "Bearer tok"}},
+					{Path: "/api1/users", Target: upstream.URL + "/users", AllowedReferers: []string{"localhost:4000"}, Headers: map[string]string{"Authentication": "Bearer tok"}},
 				},
 			},
 		},
@@ -126,10 +129,9 @@ func TestWildcardRuleProxies(t *testing.T) {
 	cfg := &config.Config{
 		Modules: config.ModulesConfig{
 			PathProxy: config.PathProxyConfig{
-				Enable:          &enable,
-				AllowedReferers: []string{"localhost:4000"},
+				Enable: &enable,
 				PathRules: []config.PathProxyRuleConfig{
-					{Path: "/api2/*", Target: upstream.URL + "/base/"},
+					{Path: "/api2/*", Target: upstream.URL + "/base/", AllowedReferers: []string{"localhost:4000"}},
 				},
 			},
 		},
@@ -148,10 +150,9 @@ func TestNoMatchReturns404(t *testing.T) {
 	cfg := &config.Config{
 		Modules: config.ModulesConfig{
 			PathProxy: config.PathProxyConfig{
-				Enable:          &enable,
-				AllowedReferers: []string{"localhost:4000"},
+				Enable: &enable,
 				PathRules: []config.PathProxyRuleConfig{
-					{Path: "/api1/users", Target: "https://api.example.com/users"},
+					{Path: "/api1/users", Target: "https://api.example.com/users", AllowedReferers: []string{"localhost:4000"}},
 				},
 			},
 		},
@@ -167,10 +168,9 @@ func TestRefererForbidden(t *testing.T) {
 	cfg := &config.Config{
 		Modules: config.ModulesConfig{
 			PathProxy: config.PathProxyConfig{
-				Enable:          &enable,
-				AllowedReferers: []string{"localhost:4000"},
+				Enable: &enable,
 				PathRules: []config.PathProxyRuleConfig{
-					{Path: "/api1/users", Target: "https://api.example.com/users"},
+					{Path: "/api1/users", Target: "https://api.example.com/users", AllowedReferers: []string{"localhost:4000"}},
 				},
 			},
 		},
@@ -194,6 +194,68 @@ func TestRefererForbidden(t *testing.T) {
 	}
 }
 
+func TestPerRuleReferersIndependent(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable: &enable,
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api1/*", Target: upstream.URL + "/", AllowedReferers: []string{"localhost:4000"}},
+					{Path: "/api2/*", Target: upstream.URL + "/", AllowedReferers: []string{"localhost:5000"}},
+				},
+			},
+		},
+	}
+
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:5000/"); w.Code != http.StatusForbidden {
+		t.Errorf("rule1 with mismatched referer code = %d, want 403", w.Code)
+	}
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:4000/"); w.Code != http.StatusNoContent {
+		t.Errorf("rule1 with matched referer code = %d, want 204", w.Code)
+	}
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api2/users", "http://localhost:4000/"); w.Code != http.StatusForbidden {
+		t.Errorf("rule2 with mismatched referer code = %d, want 403", w.Code)
+	}
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api2/users", "http://localhost:5000/"); w.Code != http.StatusNoContent {
+		t.Errorf("rule2 with matched referer code = %d, want 204", w.Code)
+	}
+}
+
+func TestRuleWithoutReferersForbidden(t *testing.T) {
+	var hit bool
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		hit = true
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer upstream.Close()
+
+	enable := true
+	cfg := &config.Config{
+		Modules: config.ModulesConfig{
+			PathProxy: config.PathProxyConfig{
+				Enable: &enable,
+				PathRules: []config.PathProxyRuleConfig{
+					{Path: "/api1/*", Target: upstream.URL + "/"},
+				},
+			},
+		},
+	}
+
+	w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:4000/")
+	if w.Code != http.StatusForbidden {
+		t.Fatalf("code = %d, want 403", w.Code)
+	}
+	if hit {
+		t.Fatal("upstream should not have been hit without rule-level allowed_referers")
+	}
+}
+
 func TestWildcardRulePreservesEscapedPath(t *testing.T) {
 	var gotEscaped string
 	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -206,10 +268,9 @@ func TestWildcardRulePreservesEscapedPath(t *testing.T) {
 	cfg := &config.Config{
 		Modules: config.ModulesConfig{
 			PathProxy: config.PathProxyConfig{
-				Enable:          &enable,
-				AllowedReferers: []string{"localhost:4000"},
+				Enable: &enable,
 				PathRules: []config.PathProxyRuleConfig{
-					{Path: "/api2/*", Target: upstream.URL + "/base/"},
+					{Path: "/api2/*", Target: upstream.URL + "/base/", AllowedReferers: []string{"localhost:4000"}},
 				},
 			},
 		},

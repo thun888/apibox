@@ -142,6 +142,7 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 
 - `path`：模块前缀 `/api/pathproxy` 之后的路径，支持精确匹配（如 `/api1/users`）与末尾 `*` 通配（如 `/api2/*`）。通配命中后，通配部分会拼接到 `target` 的路径之后。
 - `target`：目标上游 URL（http/https），如 `https://api.example.com/users` 或 `https://api.example.com/`。
+- `allowed_referers`：当前规则单独的 Referer 白名单。
 - `headers`：可选，转发时额外设置或覆盖的上游请求头。
 - 请求方法、查询参数与请求体原样转发；查询参数会与 `target` 中已有的 query 合并。
 - 未命中任何规则返回 404；上游失败返回 502；Referer 不在白名单返回 403。
@@ -272,7 +273,7 @@ func RegisterController(c Controller)
 
 ## 安全
 
-- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；配置项为 `"*"` 时允许任意 Referer 主机；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo、pathproxy 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
+- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；配置项为 `"*"` 时允许任意 Referer 主机；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo 使用模块级白名单；pathproxy 只在每条 `path_rules` 中单独配置，无模块级 `allowed_referers`。qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
 - **CORS**：`server.allowed_origins`。包含 `"*"` 时允许任意 Origin（回显请求 Origin，配合 Credentials 不能直接返回 `*`）；否则按列表精确匹配。
 - **可信代理**：`server.trusted_proxies` 传给 gin 的 `SetTrustedProxies`，影响 `c.ClientIP()`。
 

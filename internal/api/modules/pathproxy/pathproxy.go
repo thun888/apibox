@@ -5,14 +5,19 @@
 //
 //   - path: "/api1/users"
 //     target: "https://api.example.com/users"
+//     allowed_referers:
+//   - "localhost:4000"
 //     headers:
 //     Authentication: "Bearer your-token"
 //   - path: "/api2/*"
 //     target: "https://api.example.com/"
+//     allowed_referers:
+//   - "localhost:5000"
 //
 // path 为模块前缀 /api/pathproxy 之后的路径；末尾 "*" 表示通配其后任意
 // 路径，命中后把通配部分拼接在 target 的路径之后。请求方法、查询参数与
-// 请求体原样转发；headers 中的配置会设置/覆盖到上游请求。
+// 请求体原样转发；headers 中的配置会设置/覆盖到上游请求。每条规则通过
+// 自己的 allowed_referers 校验来源。
 package pathproxy
 
 import (
@@ -60,11 +65,12 @@ func (c *Controller) Register(r *gin.RouterGroup) {
 
 // proxyRule 编译后的一条路径代理规则。
 type proxyRule struct {
-	path     string // 配置的 path，如 /api1/users
-	prefix   string // 精确路径，或通配规则中去掉 "/*" 的前缀
-	wildcard bool   // 是否为末尾 "*" 通配
-	target   *url.URL
-	headers  map[string]string
+	path            string // 配置的 path，如 /api1/users
+	prefix          string // 精确路径，或通配规则中去掉 "/*" 的前缀
+	wildcard        bool   // 是否为末尾 "*" 通配
+	target          *url.URL
+	allowedReferers []string
+	headers         map[string]string
 }
 
 // match 判断模块前缀之后的请求路径 p 是否命中当前规则；命中时 rest 为
@@ -108,7 +114,12 @@ func compileRules(cfgs []config.PathProxyRuleConfig) []proxyRule {
 			continue
 		}
 
-		r := proxyRule{path: path, target: target, headers: make(map[string]string)}
+		r := proxyRule{
+			path:            path,
+			target:          target,
+			allowedReferers: c.AllowedReferers,
+			headers:         make(map[string]string),
+		}
 		switch {
 		case path == "/*":
 			r.wildcard = true
@@ -167,13 +178,8 @@ var upstreamTransport = &http.Transport{
 	ResponseHeaderTimeout: upstreamTimeout,
 }
 
-// handle 校验 Referer 后按规则转发请求。
+// handle 按命中的规则转发请求：先匹配路径，再按该规则单独校验 Referer。
 func (c *Controller) handle(ctx *gin.Context) {
-	if !utils.CheckReferer(config.Cfg.Modules.PathProxy.AllowedReferers, ctx) {
-		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
-		return
-	}
-
 	p := ctx.Param("proxyPath")
 	if p == "" {
 		p = "/"
@@ -191,6 +197,11 @@ func (c *Controller) handle(ctx *gin.Context) {
 	}
 	if matched == nil {
 		ctx.JSON(http.StatusNotFound, gin.H{"error": "no matching path rule"})
+		return
+	}
+
+	if !utils.CheckReferer(matched.allowedReferers, ctx) {
+		ctx.JSON(http.StatusForbidden, gin.H{"error": "forbidden"})
 		return
 	}
 
