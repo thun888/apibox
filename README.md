@@ -272,7 +272,7 @@ func RegisterController(c Controller)
 
 ## 安全
 
-- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo、pathproxy 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
+- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；配置项为 `"*"` 时允许任意 Referer 主机；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo、pathproxy 启用了此校验，qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
 - **CORS**：`server.allowed_origins`。包含 `"*"` 时允许任意 Origin（回显请求 Origin，配合 Credentials 不能直接返回 `*`）；否则按列表精确匹配。
 - **可信代理**：`server.trusted_proxies` 传给 gin 的 `SetTrustedProxies`，影响 `c.ClientIP()`。
 

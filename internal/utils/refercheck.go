@@ -19,9 +19,14 @@ func ExtractHost(rawURL string) (string, error) {
 	return u.Host, nil
 }
 
-// IsAllowed 检查 host 是否命中白名单（后缀匹配）
+// IsAllowed 检查 host 是否命中白名单。
+// 白名单项为 "*" 时允许任意 host；其余项按后缀匹配
+// （如 "example.com" 命中 "sub.example.com"）。
 func IsAllowed(allowedReferers []string, host string) bool {
 	for _, allowed := range allowedReferers {
+		if allowed == "*" {
+			return true
+		}
 		if strings.HasSuffix(host, allowed) {
 			return true
 		}
