@@ -10,13 +10,13 @@
 
 | 模块 | 路由前缀 | 功能 | 外部依赖 |
 |------|----------|------|----------|
-| [biliinfo](https://github.com/thun888/biliinfo) | `/api/biliinfo` | 代理 Bilibili 视频信息接口 | CookieCloud（可选） |
+| [bili_info](https://github.com/thun888/biliinfo) | `/api/bili_info` | 代理 Bilibili 视频信息接口 | CookieCloud（可选） |
 | [qqmail_head](https://github.com/thun888/qq-mail-head) | `/api/qqmail_head` | 获取 QQ 邮箱头像 | CookieCloud（必需） |
-| [starvote](https://github.com/xaoxuu/star-vote) | `/api/starvote` | 投票与评分 | 数据库 |
-| [genlineanimation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/genlineanimation` | 生成手写签名动画 SVG | 无 |
-| [siteinfo](https://github.com/xaoxuu/site-info-api) | `/api/siteinfo` | 抓取网页标题/描述/图标 | Redis（可选） |
-| pathproxy | `/api/pathproxy` | 按路径规则反向代理到目标上游 | 无 |
-| [starhistory](https://github.com/Mubelotix/star-history) | `/api/starhistory` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
+| [star_vote](https://github.com/xaoxuu/star-vote) | `/api/star_vote` | 投票与评分 | 数据库 |
+| [gen_line_animation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/gen_line_animation` | 生成手写签名动画 SVG | 无 |
+| [site_info](https://github.com/xaoxuu/site-info-api) | `/api/site_info` | 抓取网页标题/描述/图标 | Redis（可选） |
+| path_proxy | `/api/path_proxy` | 按路径规则反向代理到目标上游 | 无 |
+| [star_history](https://github.com/Mubelotix/star-history) | `/api/star_history` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
 
 模块默认禁用，可通过 `modules.<name>.enable: true` 开启（见[配置](#配置)）。
 
@@ -53,7 +53,7 @@ go build -ldflags="-s -w -X github.com/thun888/apibox/internal/api.Version=v1.2.
 curl http://localhost:8080/ping
 # {"message":"pong","version":"dev"}
 
-curl "http://localhost:8080/api/biliinfo/get_video_info?bvid=BV1xx411U7xx" \
+curl "http://localhost:8080/api/bili_info/get_video_info?bvid=BV1xx411U7xx" \
   -H "Referer: http://localhost:4000/"
 ```
 
@@ -71,9 +71,9 @@ curl "http://localhost:8080/api/biliinfo/get_video_info?bvid=BV1xx411U7xx" \
 | GET | `/ping` | 健康检查，返回 `{"message":"pong","version":"<版本>"}` |
 | GET | `/` | 302 重定向到本仓库 |
 
-### biliinfo — Bilibili 视频信息
+### bili_info — Bilibili 视频信息
 
-`GET /api/biliinfo/get_video_info`
+`GET /api/bili_info/get_video_info`
 
 | 参数 | 必填 | 说明 |
 |------|------|------|
@@ -98,16 +98,16 @@ curl "http://localhost:8080/api/biliinfo/get_video_info?bvid=BV1xx411U7xx" \
 curl -o avatar.png "http://localhost:8080/api/qqmail_head/123456@qq.com"
 ```
 
-### starvote — 投票与评分
+### star_vote — 投票与评分
 
 数据持久化到数据库（表 `starvote_votes`、`starvote_ratings`），使用 UPSERT（`ON CONFLICT DO UPDATE`）累加计数。
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/starvote/vote/update` | 投票 +1：`value` 为 `up`/`down` |
-| POST | `/api/starvote/rating/update` | 评分 +1：`value` 为 1–5 的数字（小数向上取整） |
-| GET | `/api/starvote/vote/info` | 查询投票数 |
-| GET | `/api/starvote/rating/info` | 查询评分分布 |
+| POST | `/api/star_vote/vote/update` | 投票 +1：`value` 为 `up`/`down` |
+| POST | `/api/star_vote/rating/update` | 评分 +1：`value` 为 1–5 的数字（小数向上取整） |
+| GET | `/api/star_vote/vote/info` | 查询投票数 |
+| GET | `/api/star_vote/rating/info` | 查询评分分布 |
 
 - 参数 `id` 可放在表单（`application/x-www-form-urlencoded`）或查询字符串中，表单优先；GET 接口的 `id` 缺省为 `default`。
 - 更新成功返回 `{"success":"true"}`；参数缺失或非法返回 400（`{"code":400,"message":"Bad Request"}`）；数据库错误返回 500。
@@ -116,14 +116,14 @@ curl -o avatar.png "http://localhost:8080/api/qqmail_head/123456@qq.com"
 示例：
 
 ```bash
-curl -X POST "http://localhost:8080/api/starvote/vote/update" \
+curl -X POST "http://localhost:8080/api/star_vote/vote/update" \
   -H "Referer: http://localhost:4000/" \
   -d "id=test&value=up"
 ```
 
-### genlineanimation — 手写签名动画
+### gen_line_animation — 手写签名动画
 
-`GET /api/genlineanimation/signature`
+`GET /api/gen_line_animation/signature`
 
 | 参数 | 缺省 | 说明 |
 |------|------|------|
@@ -134,13 +134,13 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 
 返回 SVG（`image/svg+xml`），响应头 `Cache-Control: public, max-age=31536000`。
 
-### pathproxy — 路径代理
+### path_proxy — 路径代理
 
-`/api/pathproxy/<path>`，支持任意 HTTP 方法。
+`/api/path_proxy/<path>`，支持任意 HTTP 方法。
 
 按 `modules.pathproxy.path_rules` 规则把请求转发到目标上游：
 
-- `path`：模块前缀 `/api/pathproxy` 之后的路径，支持精确匹配（如 `/api1/users`）与末尾 `*` 通配（如 `/api2/*`）。通配命中后，通配部分会拼接到 `target` 的路径之后。
+- `path`：模块前缀 `/api/path_proxy` 之后的路径，支持精确匹配（如 `/api1/users`）与末尾 `*` 通配（如 `/api2/*`）。通配命中后，通配部分会拼接到 `target` 的路径之后。
 - `target`：目标上游 URL（http/https），如 `https://api.example.com/users` 或 `https://api.example.com/`。
 - `allowed_referers`：当前规则单独的 Referer 白名单。
 - `headers`：可选，转发时额外设置或覆盖的上游请求头。
@@ -150,15 +150,15 @@ curl -X POST "http://localhost:8080/api/starvote/vote/update" \
 示例：
 
 ```bash
-curl "http://localhost:8080/api/pathproxy/api1/users?active=1" \
+curl "http://localhost:8080/api/path_proxy/api1/users?active=1" \
   -H "Referer: http://localhost:4000/"
 ```
 
-### siteinfo — 网页站点信息
+### site_info — 网页站点信息
 
 移植 [site-info-api](https://github.com/thun888/site-info-api) 两个接口：
 
-#### `GET /api/siteinfo/info` — 站点信息 JSON
+#### `GET /api/site_info/info` — 站点信息 JSON
 
 | 参数 | 缺省 | 说明 |
 |------|------|------|
@@ -168,7 +168,7 @@ curl "http://localhost:8080/api/pathproxy/api1/users?active=1" \
 
 - 返回 `{"title","desc","icon","iconBase64","url"}`，字段缺省省略；未提取到任何信息或上游失败返回 `{}`。
 
-#### `GET /api/siteinfo/icon` — 站点图标二进制
+#### `GET /api/site_info/icon` — 站点图标二进制
 
 | 参数 | 缺省 | 说明 |
 |------|------|------|
@@ -188,16 +188,16 @@ curl "http://localhost:8080/api/pathproxy/api1/users?active=1" \
 示例：
 
 ```bash
-curl "http://localhost:8080/api/siteinfo/info?url=https://github.com/thun888/apibox&embedIcon=1" \
+curl "http://localhost:8080/api/site_info/info?url=https://github.com/thun888/apibox&embedIcon=1" \
   -H "Referer: http://localhost:4000/"
 
-curl -o icon.png "http://localhost:8080/api/siteinfo/icon?url=https://github.com/thun888/apibox" \
+curl -o icon.png "http://localhost:8080/api/site_info/icon?url=https://github.com/thun888/apibox" \
   -H "Referer: http://localhost:4000/"
 ```
 
-### starhistory — GitHub 星标历史图表
+### star_history — GitHub 星标历史图表
 
-[star-history](https://github.com/Mubelotix/star-history) 的 SVG 生成能力移植，`GET /api/starhistory/svg`。
+[star-history](https://github.com/Mubelotix/star-history) 的 SVG 生成能力移植，`GET /api/star_history/svg`。
 
 | 参数 | 缺省 | 说明 |
 |------|------|------|
@@ -220,7 +220,7 @@ curl -o icon.png "http://localhost:8080/api/siteinfo/icon?url=https://github.com
 示例：
 
 ```bash
-curl -o stars.svg "http://localhost:8080/api/starhistory/svg?repos=thun888/apibox&theme=dark"
+curl -o stars.svg "http://localhost:8080/api/star_history/svg?repos=thun888/apibox&theme=dark"
 ```
 
 </details>
@@ -260,7 +260,7 @@ func RegisterController(c Controller)
 | 日志 | `utils.NewModuleLogger` | slog 文本输出到 stdout，自动带 `module` 属性 |
 | 配置 | `config.Cfg` | 模块配置在 `ModulesConfig`，共享凭据在顶层 `secrets` 段 |
 
-### 请求流程（以 biliinfo 为例）
+### 请求流程（以 bili_info 为例）
 
 ```
 请求进入 gin 路由
@@ -273,7 +273,7 @@ func RegisterController(c Controller)
 
 ## 安全
 
-- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；配置项为 `"*"` 时允许任意 Referer 主机；Referer 缺失或不在白名单返回 403。biliinfo、starvote、genlineanimation、siteinfo 使用模块级白名单；pathproxy 只在每条 `path_rules` 中单独配置，无模块级 `allowed_referers`。qqmail_head、starhistory 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
+- **Referer 白名单**：`modules.<name>.allowed_referers`，对 Referer 头的主机名做后缀匹配；配置项为 `"*"` 时允许任意 Referer 主机；Referer 缺失或不在白名单返回 403。bili_info、star_vote、gen_line_animation、site_info 使用模块级白名单；path_proxy 只在每条 `path_rules` 中单独配置，无模块级 `allowed_referers`。qqmail_head、star_history 未启用（前者头像图片、后者 SVG 图表通常内嵌于第三方页面）。
 - **CORS**：`server.allowed_origins`。包含 `"*"` 时允许任意 Origin（回显请求 Origin，配合 Credentials 不能直接返回 `*`）；否则按列表精确匹配。
 - **可信代理**：`server.trusted_proxies` 传给 gin 的 `SetTrustedProxies`，影响 `c.ClientIP()`。
 
@@ -323,9 +323,9 @@ func (Vote) TableName() string { return database.BuildTableName(&Vote{}, "starvo
 ## FAQ
 
 **接口返回 403？**
-Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白名单中（后缀匹配）。qqmail_head、starhistory 不校验 Referer。
+Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白名单中（后缀匹配）。qqmail_head、star_history 不校验 Referer。
 
-**starhistory 返回 404？**
+**star_history 返回 404？**
 2026-06-30 起 GitHub 将 stargazers API 限制为仓库管理员/协作者可见，因此只能生成本人拥有/协作仓库的图表（其他仓库返回 `Repo not found in dataset`）；星标记录少于 5 条的仓库同样返回 404。
 
 **如何启用/禁用某个模块？**

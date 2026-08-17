@@ -19,7 +19,7 @@ import (
 const (
 	bilibiliAPI = "https://api.bilibili.com/x/web-interface/view"
 	cacheTTL    = 1 * time.Hour // 1 小时缓存
-	moduleName  = "biliinfo"
+	moduleName  = "bili_info"
 )
 
 var logger = utils.NewModuleLogger(moduleName)

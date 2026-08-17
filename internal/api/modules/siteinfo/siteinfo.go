@@ -35,7 +35,7 @@ import (
 )
 
 const (
-	moduleName = "siteinfo"
+	moduleName = "site_info"
 
 	cacheTTL = 30 * 24 * time.Hour // Redis 缓存 30 天
 

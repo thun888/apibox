@@ -39,7 +39,7 @@ import (
 )
 
 const (
-	moduleName      = "pathproxy"
+	moduleName      = "path_proxy"
 	upstreamTimeout = 30 * time.Second
 )
 

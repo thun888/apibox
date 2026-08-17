@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	moduleName = "genlineanimation"
+	moduleName = "gen_line_animation"
 	// logger     = utils.NewModuleLogger(moduleName)
 )
 

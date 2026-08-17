@@ -102,7 +102,7 @@ func TestExactRuleProxies(t *testing.T) {
 			},
 		},
 	}
-	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api1/users?x=1")
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/path_proxy/api1/users?x=1")
 	if w.Code != http.StatusOK {
 		t.Fatalf("code = %d, want 200", w.Code)
 	}
@@ -136,7 +136,7 @@ func TestWildcardRuleProxies(t *testing.T) {
 			},
 		},
 	}
-	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api2/users/42")
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/path_proxy/api2/users/42")
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("code = %d, want 204", w.Code)
 	}
@@ -157,7 +157,7 @@ func TestNoMatchReturns404(t *testing.T) {
 			},
 		},
 	}
-	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/other")
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/path_proxy/other")
 	if w.Code != http.StatusNotFound {
 		t.Fatalf("code = %d, want 404", w.Code)
 	}
@@ -186,7 +186,7 @@ func TestRefererForbidden(t *testing.T) {
 	ctrl.Register(g)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/pathproxy/api1/users", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/path_proxy/api1/users", nil)
 	req.Header.Set("Referer", "http://evil.example/")
 	r.ServeHTTP(w, req)
 	if w.Code != http.StatusForbidden {
@@ -213,16 +213,16 @@ func TestPerRuleReferersIndependent(t *testing.T) {
 		},
 	}
 
-	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:5000/"); w.Code != http.StatusForbidden {
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/path_proxy/api1/users", "http://localhost:5000/"); w.Code != http.StatusForbidden {
 		t.Errorf("rule1 with mismatched referer code = %d, want 403", w.Code)
 	}
-	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:4000/"); w.Code != http.StatusNoContent {
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/path_proxy/api1/users", "http://localhost:4000/"); w.Code != http.StatusNoContent {
 		t.Errorf("rule1 with matched referer code = %d, want 204", w.Code)
 	}
-	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api2/users", "http://localhost:4000/"); w.Code != http.StatusForbidden {
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/path_proxy/api2/users", "http://localhost:4000/"); w.Code != http.StatusForbidden {
 		t.Errorf("rule2 with mismatched referer code = %d, want 403", w.Code)
 	}
-	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api2/users", "http://localhost:5000/"); w.Code != http.StatusNoContent {
+	if w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/path_proxy/api2/users", "http://localhost:5000/"); w.Code != http.StatusNoContent {
 		t.Errorf("rule2 with matched referer code = %d, want 204", w.Code)
 	}
 }
@@ -247,7 +247,7 @@ func TestRuleWithoutReferersForbidden(t *testing.T) {
 		},
 	}
 
-	w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/pathproxy/api1/users", "http://localhost:4000/")
+	w := runRequestWithCfgAndReferer(t, cfg, http.MethodGet, "/api/path_proxy/api1/users", "http://localhost:4000/")
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("code = %d, want 403", w.Code)
 	}
@@ -275,7 +275,7 @@ func TestWildcardRulePreservesEscapedPath(t *testing.T) {
 			},
 		},
 	}
-	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/pathproxy/api2/a%2Fb")
+	w := runRequestWithCfg(t, cfg, http.MethodGet, "/api/path_proxy/api2/a%2Fb")
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("code = %d, want 204", w.Code)
 	}
@@ -322,7 +322,7 @@ func TestPathProxyStripsUpstreamCORSHeaders(t *testing.T) {
 	ctrl.Register(g)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/pathproxy/raw/thun888/Friend-Circle/file.json", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/path_proxy/raw/thun888/Friend-Circle/file.json", nil)
 	req.Header.Set("Referer", "https://blog.hzchu.top/")
 	r.ServeHTTP(w, req)
 

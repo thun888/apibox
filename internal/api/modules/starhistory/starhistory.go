@@ -34,7 +34,7 @@ import (
 	"github.com/thun888/apibox/internal/utils"
 )
 
-const moduleName = "starhistory"
+const moduleName = "star_history"
 
 const (
 	maxReposPerRequest = 20

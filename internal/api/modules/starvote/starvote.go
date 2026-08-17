@@ -16,7 +16,7 @@ import (
 )
 
 var (
-	moduleName = "starvote"
+	moduleName = "star_vote"
 )
 var logger = utils.NewModuleLogger(moduleName)
 
