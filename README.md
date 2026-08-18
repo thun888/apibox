@@ -14,7 +14,7 @@
 | [qqmail_head](https://github.com/thun888/qq-mail-head) | `/api/qqmail_head` | 获取 QQ 邮箱头像 | CookieCloud（必需） |
 | [star_vote](https://github.com/xaoxuu/star-vote) | `/api/star_vote` | 投票与评分 | 数据库 |
 | [gen_line_animation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/gen_line_animation` | 生成手写签名动画 SVG | 无 |
-| [hits](https://github.com/dwyl/hits) | `/api/hit_count` | 访问计数徽章（SVG / JSON） | 数据库、Redis（必需） |
+| [hitcount](https://github.com/dwyl/hits) | `/api/hit_count` | 访问计数徽章（SVG / JSON） | 数据库、Redis（必需） |
 | [site_info](https://github.com/xaoxuu/site-info-api) | `/api/site_info` | 抓取网页标题/描述/图标 | Redis（可选） |
 | path_proxy | `/api/path_proxy` | 按路径规则反向代理到目标上游 | 无 |
 | [star_history](https://github.com/Mubelotix/star-history) | `/api/star_history` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
