@@ -71,6 +71,11 @@ func (c *Controller) Enabled() bool               { return config.Cfg.Modules.Hi
 
 ## 常用代码模式
 
+**缓存实现**：需要缓存时优先使用 Redis（`cache.Client`），key 建议带模块前缀
+（如 `hitcount:delta`、`starhistory:svg:`）。未配置 Redis 时按模块语义降级：
+缓存类可选依赖直接跳过（如 biliinfo/siteinfo），必需依赖显式报错
+（如 hitcount 返回 503）。
+
 **数据库模型 + 表名**：
 
 ```go
