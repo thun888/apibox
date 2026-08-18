@@ -7,10 +7,11 @@
 //	GET /api/hit_count/<path>.svg   → SVG 徽章（image/svg+xml）
 //	GET /api/hit_count/<path>.json  → JSON（shields.io endpoint 格式）
 //
-// 计数流程：请求先写入内存缓冲并立即返回「数据库累计值 + 缓冲增量」，
-// 后台协程每 5 分钟（可通过 sync_interval 配置）把缓冲增量 upsert 进
-// 数据库后释放缓冲；进程优雅退出时也会 flush 一次，避免丢失最近一个
-// 周期的计数。
+// 计数流程：请求先 HINCRBY 把增量写入 Redis 缓冲（多实例共享、重启不丢），
+// 并立即返回「数据库累计值 + 缓冲增量」；后台协程每 5 分钟（可通过
+// sync_interval 配置）用 Lua 脚本原子取出缓冲增量、upsert 进数据库后
+// 释放缓冲；进程优雅退出时也会 flush 一次，避免丢失最近一个周期的计数。
+// 本模块依赖 Redis：未配置 Redis 时接口返回 503。
 package hitcount
 
 import (
@@ -21,6 +22,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/thun888/apibox/internal/api"
+	"github.com/thun888/apibox/internal/cache"
 	"github.com/thun888/apibox/internal/config"
 	"github.com/thun888/apibox/internal/utils"
 )
@@ -50,6 +52,11 @@ func (c *Controller) Shutdown() { stopAndFlush() }
 
 // handleHit GET /api/hit_count/<path>.svg | GET /api/hit_count/<path>.json
 func handleHit(ctx *gin.Context) {
+	if cache.Client == nil {
+		ctx.JSON(http.StatusServiceUnavailable, gin.H{"error": "hit_count requires redis"})
+		return
+	}
+
 	key, format, ok := extractKey(ctx.Param("path"))
 	if !ok {
 		ctx.JSON(http.StatusBadRequest, gin.H{

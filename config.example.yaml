@@ -60,7 +60,7 @@ modules:
       - "localhost:5000"
   hitcount:
     enable: true
-    sync_interval: 5m      # 内存计数缓冲同步到数据库的间隔（默认 5m）
+    sync_interval: 5m      # Redis 计数缓冲同步到数据库的间隔（默认 5m）
   starhistory:
     enable: true
   siteinfo:

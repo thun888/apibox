@@ -105,7 +105,8 @@ database.DB.Clauses(clause.OnConflict{
 因为通常内嵌于 README/第三方页面，没有 Referer。
 
 **后台定时任务**：惰性启动（`sync.Once` + 首次使用时启动 goroutine），
-`Shutdown()` 里停表并同步一次。缓冲先整体换出再写库，失败的数据合并回缓冲下轮重试，
+`Shutdown()` 里停表并同步一次。缓冲先原子取出再写库——Redis 缓冲用 Lua 脚本
+「HGETALL + DEL」一次性 drain；写库失败的增量退回 Redis 缓冲下轮重试，
 避免丢数据（见 `hitcount/counter.go`）。
 
 **gin 路由细节**：
@@ -121,7 +122,7 @@ database.DB.Clauses(clause.OnConflict{
 | qqmailhead | `/api/qqmail_head` | CookieCloud（必需） |
 | starvote | `/api/star_vote` | 数据库 |
 | genlineanimation | `/api/gen_line_animation` | 无 |
-| hitcount | `/api/hit_count` | 数据库（内存缓冲 5 分钟同步） |
+| hitcount | `/api/hit_count` | 数据库 + Redis（必需，增量缓冲 5 分钟同步） |
 | starhistory | `/api/star_history` | GitHub Token + Redis/数据库两级缓存 |
 | siteinfo | `/api/site_info` | Redis（可选）、上游代理（可选） |
 | pathproxy | `/api/path_proxy` | 无（每条规则单独 Referer 白名单） |
