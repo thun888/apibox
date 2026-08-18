@@ -45,6 +45,7 @@ func main() {
 		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 		<-quit
 		logger.Info("Shutting down...")
+		api.Shutdown() // 通知各模块收尾（如 hitcount flush 内存计数）
 		cache.Close()
 		database.Close()
 		os.Exit(0)

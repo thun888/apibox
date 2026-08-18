@@ -14,6 +14,7 @@
 | [qqmail_head](https://github.com/thun888/qq-mail-head) | `/api/qqmail_head` | 获取 QQ 邮箱头像 | CookieCloud（必需） |
 | [star_vote](https://github.com/xaoxuu/star-vote) | `/api/star_vote` | 投票与评分 | 数据库 |
 | [gen_line_animation](https://github.com/jrenc2002/GenLineAnimation-Server) | `/api/gen_line_animation` | 生成手写签名动画 SVG | 无 |
+| [hits](https://github.com/dwyl/hits) | `/api/hit_count` | 访问计数徽章（SVG / JSON） | 数据库 |
 | [site_info](https://github.com/xaoxuu/site-info-api) | `/api/site_info` | 抓取网页标题/描述/图标 | Redis（可选） |
 | path_proxy | `/api/path_proxy` | 按路径规则反向代理到目标上游 | 无 |
 | [star_history](https://github.com/Mubelotix/star-history) | `/api/star_history` | 生成 GitHub 星标历史图表 SVG | GitHub Token（需仓库管理员/协作者） |
@@ -133,6 +134,30 @@ curl -X POST "http://localhost:8080/api/star_vote/vote/update" \
 | color | `#000000` | 笔画颜色 |
 
 返回 SVG（`image/svg+xml`），响应头 `Cache-Control: public, max-age=31536000`。
+
+### hit_count — 访问计数徽章
+
+`GET /api/hit_count/<path>.svg` 与 `GET /api/hit_count/<path>.json`，两个端点共享同一计数器（键为去掉 `.svg`/`.json` 后缀的路径）。
+
+| 参数 | 缺省 | 说明 |
+|------|------|------|
+| label | `hits` | 徽章左侧文字（最长 40 字符） |
+| color | `4c1` | 右侧计数区颜色，3/6 位十六进制 |
+| style | `flat` | 徽章样式：`flat`（圆角+高光）或 `flat-square`（直角） |
+
+- SVG 返回 `image/svg+xml`；JSON 返回 shields.io endpoint 格式（`schemaVersion`/`label`/`message`/`color`/`style`），可用作 [shields.io 动态徽章](https://shields.io/badges/dynamic-json-badge)。
+- 计数流程：请求先写入内存缓冲并立即返回「数据库累计值 + 缓冲增量」，后台每 5 分钟（`sync_interval`，默认 `5m`）把缓冲增量 upsert 进数据库后释放缓冲；进程优雅退出时也会 flush 一次。数据库为键值对存储（表 `hitcount_hits`：`path` 主键 → `count` 累计值）。
+- 响应头 `Cache-Control: no-store`，计数结果不做任何缓存。
+- 路径段允许字母、数字、`-`、`_`、`.`；非法路径或非 `.svg`/`.json` 后缀返回 400。
+
+示例：
+
+```bash
+# 徽章（可直接嵌入 <img> 或 Markdown）
+curl -i "http://localhost:8080/api/hit_count/user/repo.svg"
+# JSON（可接入 shields.io: https://img.shields.io/endpoint?url=...）
+curl "http://localhost:8080/api/hit_count/user/repo.json?label=views&color=4c1&style=flat-square"
+```
 
 ### path_proxy — 路径代理
 

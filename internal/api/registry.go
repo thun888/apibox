@@ -29,6 +29,17 @@ func RegisterController(c Controller) {
 	controllers = append(controllers, c)
 }
 
+// Shutdown 在进程退出前触发所有模块的可选收尾逻辑：
+// 模块只需额外实现 Shutdown() 方法（如 hitcount 将内存计数刷入数据库）
+// 就会被调用。
+func Shutdown() {
+	for _, c := range controllers {
+		if h, ok := c.(interface{ Shutdown() }); ok {
+			h.Shutdown()
+		}
+	}
+}
+
 // SetupRouter 统一加载所有已注册的 Controller
 // mode: debug | release | test，在创建 Engine 前设置
 // trustedProxies: 反向代理可信 IP 列表，影响 c.ClientIP()

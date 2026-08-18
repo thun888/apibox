@@ -28,6 +28,7 @@ type ModulesConfig struct {
 	QQMailHead       QQMailHeadConfig       `yaml:"qqmailhead"`
 	StarVote         StarVoteConfig         `yaml:"starvote"`
 	GenLineAnimation GenLineAnimationConfig `yaml:"genlineanimation"`
+	HitCount         HitCountConfig         `yaml:"hitcount"`
 	StarHistory      StarHistoryConfig      `yaml:"starhistory"`
 	SiteInfo         SiteInfoConfig         `yaml:"siteinfo"`
 	PathProxy        PathProxyConfig        `yaml:"pathproxy"`
@@ -115,6 +116,15 @@ type GenLineAnimationConfig struct {
 
 // Enabled 模块是否启用
 func (c *GenLineAnimationConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
+
+// HitCountConfig 访问计数模块配置
+type HitCountConfig struct {
+	Enable       *bool         `yaml:"enable"`        // 未配置时默认禁用
+	SyncInterval time.Duration `yaml:"sync_interval"` // 内存缓冲同步数据库间隔，默认 5m
+}
+
+// Enabled 模块是否启用
+func (c *HitCountConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // StarHistoryConfig 星标历史图表模块配置
 // 说明：SVG 图表通常内嵌于 README 等场景（无 Referer），故不做来源校验；
