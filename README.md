@@ -236,9 +236,9 @@ curl -o icon.png "http://localhost:8080/api/site_info/icon?url=https://github.co
 
 - 返回 SVG（`image/svg+xml;charset=utf-8`），响应头 `Cache-Control: public, s-maxage=86400, max-age=86400`。
 - 仓库名大小写不敏感：非小写请求会 301 到规范 URL。
-- 数据源：GitHub stargazers API（`GET api.github.com/repos/{repo}/stargazers`，`Accept: application/vnd.github.star+json` 返回带 `starred_at` 的列表，按日期聚合为累计星标数），与原项目流水线的数据语义一致。2026-06-30 起 GitHub 将该 API 限制为仓库管理员/协作者可见，因此需在 `secrets.github_token` 配置令牌，且只能生成本人拥有/协作仓库的图表。
-- 一次请求最多 20 个仓库，未命中的仓库并发抓取（翻页 `per_page=100`）；头像取仓库 owner 的 `avatar_url`（`&s=22`）并内联为 base64 data URL。
-- 星标数据缓存 24 小时：优先 Redis，未命中读数据库表 `starhistory_star_data_caches`（配置了数据库时自动启用），仍未命中才请求 GitHub API。回源时复用过期的库缓存行做增量抓取——总数持平只翻最后一页确认（2 次 API 调用即完成刷新），总数增加只翻新增尾页并合并，合并结果与 `stargazers_count` 校验不符或总数减少时回退全量；回源结果写回两级缓存。渲染结果（SVG）仅 Redis 缓存。
+- 数据源：GitHub stargazers/history API（`GET api.github.com/repos/{repo}/stargazers/history`，周聚合、周内按天、空天补 0），展开为按日累计星标数；任意公开仓库可访问。当前星标数与 `stargazers/count` 端点核对，不一致仅记日志（unstar 等场景）。
+- 一次请求最多 20 个仓库，未命中的仓库并发抓取（翻页 30 周/页，上限 100 页）；头像取仓库 owner 的 `avatar_url`（`&s=22`）并内联为 base64 data URL。
+- 星标数据缓存 24 小时：优先 Redis，未命中读数据库表 `starhistory_star_data_caches`（配置了数据库时自动启用），仍未命中才请求 GitHub API，回源结果写回两级缓存。渲染结果（SVG）仅 Redis 缓存。
 - 不校验 Referer（SVG 通常内嵌于 README / 卡片场景）。
 - 错误响应：400（缺少 `repos` / 超过 20 个仓库）；404（仓库不存在、无权访问或星标记录少于 5 条，如 `Repo not found in dataset: xxx/yyy`）；502（GitHub API 失败、令牌无效或配额耗尽）；503（`style=landscape1`，OG 卡片已禁用）。
 
@@ -351,7 +351,7 @@ func (Vote) TableName() string { return database.BuildTableName(&Vote{}, "starvo
 Referer 头缺失，或其主机名不在对应模块的 `allowed_referers` 白名单中（后缀匹配）。qqmail_head、star_history 不校验 Referer。
 
 **star_history 返回 404？**
-2026-06-30 起 GitHub 将 stargazers API 限制为仓库管理员/协作者可见，因此只能生成本人拥有/协作仓库的图表（其他仓库返回 `Repo not found in dataset`）；星标记录少于 5 条的仓库同样返回 404。
+仓库不存在、为私有仓库，或星标记录少于 5 条时，返回 `Repo not found in dataset`。
 
 **如何启用/禁用某个模块？**
 模块默认禁用，在 `config.yaml` 中设置 `modules.<name>.enable: true` 才会注册该模块的路由；设为 `false` 或删除该字段则不会注册。

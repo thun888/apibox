@@ -1,19 +1,9 @@
-// Package starhistory 移植 star-history（github.com/Mubelotix/star-history）
-// 的 SVG 星标历史图表生成能力，仅保留 /svg 图像接口。
+// Package starhistory 提供 SVG 星标历史图表接口（GET /api/star_history/svg，
+// 参数语义与 star-history 对齐）。
 //
-// 与原项目架构一致：渲染前的数据来自 GitHub stargazers API（原项目为本地
-// repos.sqlite，由外部流水线填充）。2026-06-30 起 GitHub 将该 API 限制为
-// 仓库管理员/协作者可见，因此需配置 secrets.github_token，且只能生成
-// 本人拥有/协作仓库的图表。
-//
-// 星标数据按 Redis → 数据库 → GitHub API 三级读取：Redis 未命中时查库
-// （表 starhistory_star_data_caches，TTL 与 Redis 一致 24h，未配置数据库
-// 时自动跳过），仍未命中才回源 GitHub。回源时把过期的库缓存行作为基准
-// 增量复用（总数持平只翻最后一页确认、总数增加只翻新增尾页，结果与
-// stargazers_count 校验不符则回退全量）；回源结果写回两级缓存。
-//
-// 渲染部分（坐标轴刻度、折线、图例、水印、ToolTip 占位）在 Go 中逐元素
-// 复刻 JSDOM + d3 v2/v3 的输出，详见 chart.go / d3ticks.go。
+// 星标数据来自 GitHub stargazers/history 周聚合接口（任意公开仓库可访问），
+// 展开为按日累计记录；按 Redis → 数据库（表 starhistory_star_data_caches，
+// 24h，未配置数据库时自动跳过）→ API 回源三级读取，回源结果写回两级缓存。
 package starhistory
 
 import (
@@ -199,8 +189,8 @@ func handleSVG(ctx *gin.Context) {
 }
 
 // loadReposData 批量加载仓库星标数据：逐仓库优先读 Redis 缓存，未命中查
-// 数据库缓存（24h，与 Redis 一致），仍未命中的并发抓取 GitHub stargazers
-// API——抓取时把过期的库缓存行作为基准增量复用（见 github.go）。
+// 数据库缓存（24h，与 Redis 一致），仍未命中的并发回源 GitHub
+// stargazers/history API。
 // 返回按请求顺序排列的数据与缺失仓库列表（仓库不存在、无权访问或星标
 // 记录过少）。
 func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []string, error) {
@@ -217,15 +207,13 @@ func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []stri
 		}
 	}
 
-	// 数据库缓存兜底（Redis 未命中的仓库）：新鲜行直接命中，过期行作为
-	// 增量抓取的复用基准（prev）
+	// 数据库缓存兜底（Redis 未命中的仓库），仅使用 TTL 内的新鲜行
 	dbMiss := make([]string, 0, len(repos))
 	for i, repo := range repos {
 		if ordered[i] == nil {
 			dbMiss = append(dbMiss, repo)
 		}
 	}
-	prev := make(map[string]*repoStarData, len(dbMiss))
 	if len(dbMiss) > 0 {
 		fromDB, fetched := dbLoadStarData(ctx, dbMiss)
 		for i, repo := range repos {
@@ -243,8 +231,6 @@ func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []stri
 						}
 					}
 				}
-			} else {
-				prev[repo] = d
 			}
 		}
 	}
@@ -274,7 +260,7 @@ func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []stri
 			wg.Add(1)
 			go func(repo string) {
 				defer wg.Done()
-				data, miss, err := fetchRepoStarData(ctx, token, repo, prev[repo])
+				data, miss, err := fetchRepoStarData(ctx, token, repo)
 				if err != nil {
 					mu.Lock()
 					if fetchErr == nil {
@@ -313,7 +299,7 @@ func loadReposData(ctx context.Context, repos []string) ([]*repoStarData, []stri
 		}
 	}
 
-	// 概率式清理过期行（见 store.go；本请求保存/复用的行已刷新 fetched_at，不会误删）
+	// 概率式清理过期行（见 store.go）
 	dbPurgeExpired(ctx)
 
 	out := make([]*repoStarData, 0, len(repos))

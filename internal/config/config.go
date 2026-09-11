@@ -128,8 +128,8 @@ func (c *HitCountConfig) Enabled() bool { return c.Enable != nil && *c.Enable }
 
 // StarHistoryConfig 星标历史图表模块配置
 // 说明：SVG 图表通常内嵌于 README 等场景（无 Referer），故不做来源校验；
-// 数据来自 GitHub stargazers API（2026-06-30 起仅仓库管理员/协作者可访问，
-// 需 secrets.github_token），经 Redis 缓存（24h）。
+// 数据来自 GitHub stargazers/history API（任意公开仓库可访问，匿名配额
+// 60 次/小时），经 Redis 缓存（24h）。
 type StarHistoryConfig struct {
 	Enable *bool `yaml:"enable"` // 未配置时默认禁用
 }

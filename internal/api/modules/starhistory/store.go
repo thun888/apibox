@@ -1,11 +1,8 @@
 package starhistory
 
-// 星标数据数据库缓存：GORM 模型 + 读写辅助。
-//
-// 数据源是 GitHub stargazers API，全量翻页抓取成本高且受 5000 次/小时
-// 配额限制。Redis 缓存易失（重启/淘汰即丢），这里额外落库兜底，TTL 与
-// Redis 一致（24h）：Redis 未命中时查库，仍未命中才回源 GitHub。过期的
-// 库缓存行不直接丢弃，而是作为增量抓取的复用基准（见 github.go）。
+// 星标数据数据库缓存。回源 GitHub stargazers/history API 受配额限制
+// （匿名 60 次/小时），Redis 缓存易失（重启/淘汰即丢），故落库兜底，
+// TTL 与 Redis 一致（24h）：Redis 未命中时查库，仍未命中才回源。
 //
 // 未配置数据库（database.DB == nil）时自动跳过，不影响纯 Redis 部署。
 
@@ -42,9 +39,7 @@ func init() {
 	database.RegisterModel(&StarDataCache{})
 }
 
-// dbLoadStarData 批量读取数据库缓存行（不过滤新鲜度）。返回解析后的数据
-// 与各行的 fetched_at：调用方按缓存 TTL 判断——新鲜的行直接使用，过期的
-// 行作为增量抓取的复用基准。
+// dbLoadStarData 批量读取数据库缓存行，返回各行 fetched_at 由调用方判断新鲜度
 func dbLoadStarData(ctx context.Context, repos []string) (map[string]*repoStarData, map[string]time.Time) {
 	data := make(map[string]*repoStarData, len(repos))
 	fetched := make(map[string]time.Time, len(repos))
